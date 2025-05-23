@@ -1,0 +1,133 @@
+import os, json, shutil, subprocess
+from datetime import datetime
+from pathlib import Path
+
+CLIENT_TEMPLATE_DIR = "../client_template"
+BUILD_OUTPUT_DIR = "../builds"
+
+class Build_client():
+    def load_config():
+        config_path = os.path.join(CLIENT_TEMPLATE_DIR,"/config.json")
+        with open(config_path) as f:
+            config = json.load(f)
+
+        return config
+
+    def build(config):
+
+        # define client config data
+        client_id = config["client_id"]
+        server_url = config["server_url"]
+        watch_dirs = config["watch_dirs"]
+        platform = config["platform"]
+
+        # generate timestamped build directory
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        build_id = f"{client_id}_{timestamp}"
+        build_dir = os.path.join(BUILD_OUTPUT_DIR, build_id)
+        os.makedirs(build_dir, exist_ok=True)
+
+        # copy entire client template into the build directory
+        shutil.copytree(CLIENT_TEMPLATE_DIR, build_dir, dirs_exist_ok=True)
+
+        # build binary using PyInstaller
+        pyinstaller_cmd = [
+            "pyinstaller",
+            "--onefile",
+            "--distpath", build_dir,
+            "--workpath", os.path.join(build_dir, "build"),
+            "--specpath", os.path.join(build_dir, "spec"),
+            os.path.join(build_dir, "main.py")
+        ]
+        result = subprocess.run(pyinstaller_cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"[!] Build failed: {result.stderr}")
+            return None
+        
+        binary_path = os.path.join(build_dir, "main")
+        if not os.path.exists(binary_path):
+            print("[!] Built binary not found")
+            return None
+        
+        if platform == "deb":
+            return build_deb_package(build_dir, client_id)
+        elif platform == "rpm":
+            return build_rpm_package(build_dir, client_id)
+        else:
+            print(f"[!] Unsupported package platform: {platform}")
+            return None
+
+def build_deb_package(build_dir, client_id):
+    print("[*] Creating .deb package...")
+
+    deb_root = os.path.join(build_dir, "deb_root")
+    os.makedirs(os.path.join(deb_root, "usr", "local", "bin"), exist_ok=True)
+    shutil.copy(os.path.join(build_dir, "main"), os.path.join(deb_root, "usr", "local", "bin", f"{client_id}"))
+
+    # Control file
+    control_dir = os.path.join(deb_root, "DEBIAN")
+    os.makedirs(control_dir, exist_ok=True)
+    control_content = f"""Package: {client_id}
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: amd64
+Maintainer: Tester@Capcan.com
+Description: Honeypot client {client_id}
+"""
+    
+    with open(os.path.join(control_dir, "control"), "w") as f:
+        f.write(control_content)
+
+    # Build .deb
+    deb_path = os.path.join(build_dir, f"{client_id}.deb")
+    subprocess.run(["dpkg-deb", "--build", deb_root, deb_path])
+    print(f"[+] .deb package created at {deb_path}")
+    return deb_path
+
+def build_rpm_package(build_dir, client_id):
+    print("[*] Creating .rpm package...")
+
+    rpm_build_dir = os.path.expanduser("~/rpmbuild")
+    bin_dir = os.path.join(rpm_build_dir, "BUILTROOT", f"{client_id}-1.0-1.x86_64", "usr", "local", "bin")
+    os.makedirs(bin_dir, exist_ok=True)
+    shutil.copy(os.path.join(build_dir, "main"), os.path.join(bin_dir, client_id))
+
+    spec_dir = os.path.join(rpm_build_dir, "SPECS")
+    os.makedirs(spec_dir, exist_ok=True)
+
+    spec_content = f"""
+Name: {client_id}
+Release: 1%{{?dist}}
+Summmary: Honneypot client
+Licence: MIT
+BuildArch: x86_64
+
+%description
+Honeypot client binary
+
+%files
+/usr/local/bin/{client_id}
+
+%prep
+%build
+%install
+%clean
+"""
+    
+    spec_path = os.path.join(spec_dir, f"{client_id}.spec")
+    with open(spec_path, "w") as f:
+        f.write(spec_content)
+
+    # Build RPM
+    subprocess.run(["rpmbuild", "-bb", spec_path])
+    rpm_path = os.path.join(rpm_build_dir, "RPMS", "x86_64", f"{client_id}-1.0-1.x86_64.rpm")
+    if os.path.exists(rpm_path):
+        print(f"[+] .rpm package created at {rpm_path}")
+        return rpm_path
+    else:
+        print("[!] RPM build failed - check rpmbuild logs.")
+        return None
+
+if __name__ == "__main__":
+    Build_client.build(Build_client.load_config)
