@@ -35,4 +35,27 @@ CapCan Should be able to perform the following tasks:
     - threat heatmaps
     - alert graphs with Severity and risk models
 
-# Author: notdedyet
+### Client
+- **Deploy HoneyFiles**:
+    - text Docs.
+    - db stubs.
+    - log files.
+- **Monitor file access**:
+    - pollinng.
+    - file system hooks.
+- **mask process id**:
+    - Hide/mask process id and name when enabled.
+- **Auto-Start**:
+    - on boot.
+    - registary.
+    - services.
+- **check ins**:
+    - on boot.
+    - one a day/6hrs.
+    - on shutdown.
+- **Relay alerts**:
+    - relay alerts when honey files are accessed.
+    - alert when file system modified in abnormal way.
+    - alert when abnormal login.
+    
+### Author: notdedyet

@@ -2,12 +2,20 @@ import os, json, shutil, subprocess
 from datetime import datetime
 from pathlib import Path
 
-CLIENT_TEMPLATE_DIR = "../client_template"
-BUILD_OUTPUT_DIR = "../builds"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # builder path
+CLIENT_TEMPLATE_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "client_template")) # template path
+BUILD_OUTPUT_DIR = "../builds" # builds dir
 
 class Build_client():
     def load_config():
-        config_path = os.path.join(CLIENT_TEMPLATE_DIR,"/config.json")
+        config_path = os.path.join(CLIENT_TEMPLATE_DIR,"config.json")
+        print(config_path)
+
+        # src/client_template/config.json
+        # src/server/builder.py
+
+        # /home/dev/Desktop/capcan/src/server/client_template/config.json is
+        # /home/dev/Desktop/capcan/src/client_template/config.json
         with open(config_path) as f:
             config = json.load(f)
 
@@ -17,8 +25,8 @@ class Build_client():
 
         # define client config data
         client_id = config["client_id"]
-        server_url = config["server_url"]
-        watch_dirs = config["watch_dirs"]
+        #server_url = config["server_url"]
+        #watch_dirs = config["watch_dirs"]
         platform = config["platform"]
 
         # generate timestamped build directory
@@ -130,4 +138,4 @@ Honeypot client binary
         return None
 
 if __name__ == "__main__":
-    Build_client.build(Build_client.load_config)
+    Build_client.build(Build_client.load_config())
