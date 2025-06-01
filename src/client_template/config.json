@@ -5,5 +5,5 @@
     "watch_dirs": {
         "linux": ["/opt/traps/", "/dev/", "/etc/", "~/home/*/Documents/"]
     },
-    "platform": "rpm"
+    "platform": "deb"
 }
