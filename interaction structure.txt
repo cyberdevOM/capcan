@@ -1,0 +1,10 @@
+1. install server instance and start.
+2. launch configurator
+    2a. config static server ip
+    2b. config client hosting port
+    2c. config web server hosting
+3. open interface and prompt users to create a list of clients within the application
+    3a. when a user configs a client list, the clients must use a static ip and be given a unique identifier that will be stored in a database locally
+    3b. clients must be configured with what distribution they are running eather ".exe",".deb",or ".rpm"
+4. once clients are loaded into the config the builder should build packages for the relivent executables (exe,deb,rpm)
+    4a. packages should include the data for the servers ip address, their unique id and the code necisary to open a connection between the client and the server

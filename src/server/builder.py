@@ -166,6 +166,3 @@ install -m 755 {client_id} %{buildroot}/usr/local/bin/{client_id}
         else:
             print(f"[!] Unsupported package platform: {platform}")
             return None
-
-if __name__ == "__main__":
-    Build_client.build(Build_client.load_config())
