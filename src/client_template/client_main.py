@@ -1,4 +1,4 @@
-import json, os, time, requests
+import json, os, time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 

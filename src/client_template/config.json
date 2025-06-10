@@ -1,9 +1,6 @@
-
 {
-    "client_id": "test-client-001",
-    "server_url": "http://192.168.122.1:5000/report",
-    "watch_dirs": {
-        "linux": ["/opt/traps/", "/dev/", "/etc/", "~/home/*/Documents/"]
-    },
-    "platform": "deb"
+  "server_url": "http://192.168.8.121:9090",
+  "platform": "deb",
+  "client_id": "deb_068527_10062025_035558",
+  "watch_dirs": []
 }
