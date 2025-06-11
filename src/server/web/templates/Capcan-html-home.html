@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title}Dashboard - Capcan {% endblock %}
+{% block content %}
+    <h1>Welcome to the Capcan Dashboard</h1>
+    <div>
+        <h3>Quick Stats</h3>
+        <ul>
+            <li>Total Clients: {{ total_clients }}</li>
+            <li>Active Sessions: {{ active_sessions }}</li>
+        </ul>
+    </div>
+{% endblock %}

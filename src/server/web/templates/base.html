@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>{% block title %}Capcan Dashboard{% endblock %}</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='Capcan-css-home.css') }}">
+    </head>
+    <body>
+        div id="sidebar">
+            <h1>Capcan</h1>
+            <ul>
+                <li><a href="{{ url_for('dashboard') }}">Home</a></li>
+                <li><a href="{{ url_for('client') }}">Client</a></li>
+                <li><a href="{{ url_for('settings') }}">Settings</a></li>
+            </ul>
+        </div>
+        <div id="content">
+            {% block content %}{% endblock %}
+        </div>
+    </body>
+</html>
