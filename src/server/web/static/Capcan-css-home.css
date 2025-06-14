@@ -1,4 +1,4 @@
-body {
+body, html {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
@@ -11,7 +11,7 @@ body {
     position: fixed;
     height: 100%;
     padding: 0;
-    
+    top: 0;
 }
 
 #sidebar h2 {
@@ -34,6 +34,32 @@ body {
 #main-content {
     margin-left: 220px;
     padding: 20px;
+}
+
+#quickstats-container {
+    max-width: 400px;
+    margin: 2rem 0;
+    padding: 1.5rem 2rem;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.17);
+}
+
+#quickstats-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 18px;
+    font-size: 1.1rem;
+}
+
+#quickstats-table th {
+    text-align: left;
+    font-weight: 600;
+    padding-right: 32px;
+    color: #34495e;
+    letter-spacing: 0.02em;
+    background: none;
+    border: none;
 }
 
 

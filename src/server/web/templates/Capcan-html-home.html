@@ -1,12 +1,22 @@
 {% extends "base.html" %}
 {% block title %} Dashboard - Capcan {% endblock %}
 {% block content %}
-    <h1 id="main-content">Welcome to the Capcan Dashboard</h1>
-    <div id="main-content">
-        <h3>Quick Stats</h3>
-        <ul>
-            <li>Total Clients: {{ total_clients }}</li>
-            <li>Active Sessions: {{ active_sessions }}</li>
-        </ul>
+    <h1>Welcome to the Capcan Dashboard</h1>
+    <h3>Quick Stats</h3>
+    <div id="quickstats-container">
+        <table id="quickstats-table">
+            <tbody>
+                <tr>
+                    <th>🧑‍💻 Total Clients</th>
+                    <td>{{ total_clients }}</td>
+                </tr>
+                <th style="color: #27ae60;">🟢 Online</th>
+                <td>{{ online_clients }}</td>
+                <tr>
+                    <th style="color: c0392b;">🔴 Offline</th>
+                    <td>{{ offline_clients }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 {% endblock %}

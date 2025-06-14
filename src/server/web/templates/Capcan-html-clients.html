@@ -1,15 +1,31 @@
 {% extends "base.html" %}
 {% block title %} Client - Capcan {% endblock %}
 {% block content %}
-    <h1>Client Details</h1>
-    <table>
-        <tr><th>ID</th><th>Platform</th><th>Status</th></tr>
-        {% for client in clients %}
-        <tr>
-            <td>{{ client.id }}</td>
-            <td>{{ client.platform }}</td>
-            <td>{{ client.status }}</td>
-        </tr>
-        {% endfor %}
+<h2>Clients</h2>
+<div id="client-table-container">
+    <table id="client-table">
+        <thead>
+            <tr>
+                <th>Client ID</th>
+                <th>Platform</th>
+                <th>Status</th>
+            </tr>
     </table>
+    <tbody>
+            {% for client in clients %}
+            <tr>
+                <td>{{ client.id }}</td>
+                <td>{{ client.platform|capitalize }}</td>
+                <td>
+                    {% if client.status == "online" %}
+                        <span class="status-dot online"></span> Online
+                    {% else %}
+                        <span class="status-dot offline"></span> Offline
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </tbody>
+</div>
 {% endblock %}
