@@ -12,6 +12,17 @@
                 <li><a href="{{ url_for('Clients') }}">Client</a></li>
                 <li><a href="{{ url_for('Settings') }}">Settings</a></li>
             </ul>
+            <div class="sidebar-bottom-buttons">
+                <div class="toggle-switch">
+                    <label class="switch-label">
+                        <input type="checkbox" class="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="settings-cog">
+                    
+                </div>
+            </div>
         </div>
         <div id="main-content">
             {% block content %}{% endblock %}

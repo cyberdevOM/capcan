@@ -14,6 +14,7 @@ body{
     color: var(--text-main);
 }
 
+/* --- Sidebar --- */   
 #sidebar {
     width: 150px;
     background: var(--bg-card);
@@ -29,7 +30,7 @@ body{
     padding: 20px 20px 0px 20px;
     font-size: 1.5rem;
     margin: 0;
-    color: var(--bg-card);
+    color: var(--text-main);
 }
 
 #sidebar h2 {
@@ -45,12 +46,107 @@ body{
 }
 
 #sidebar ul li a {
-    color: var(--bg-card);
+    color: var(--text-main);
     text-decoration: none;
+    font-size: 1.1rem;
 }
 
+#sidebar ul li a:hover {
+    color: var(--text-secondary);
+    font-weight: bolder;
+}
+
+.sidebar-bottom-buttons {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    background-color: #27ae60;
+}
+
+/* --- darkmode toggle --- */
+.toggle-switch {
+    position: relative;
+    width: 60px;
+    height: 30px;
+
+    --light: #d8dbe0;
+    --dark: #28292c;
+    --link: rgb(27, 129, 112);
+    --link-hover: rgb(24, 94, 82);
+    --toggle-height: 25px;
+    --toggle-width: 50px;
+    --toggle-radius: calc(var(--toggle-height) / 2);
+    --toggle-border: 3px;
+    --knob-size: calc(var(--toggle-height) * 0.5);
+    --knob-offset: calc(var(--toggle-border) * 0.2);
+    --knob-translate: calc(var(--toggle-width) - var(--toggle-height));
+
+}
+
+.switch-label {
+    position: absolute;
+    width: 100%;
+    height: var(--toggle-height);
+    background-color: var(--dark);
+    border-radius: var(--toggle-radius);
+    cursor: pointer;
+    border: var(--toggle-border) solid var(--dark);
+}
+
+.checkbox {
+    position: absolute;
+    display: none;
+}
+
+.slider {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--toggle-radius);
+    -webkit-transition: 0.3s;
+    transition: 0.3s;
+}
+
+.checkbox:checked ~ .slider {
+    background-color: var(--light);
+}
+
+.slider::before {
+    content: "";
+    position: absolute;
+    top: var(--knob-offset);
+    left: var(--knob-offset);
+    width: var(--knob-size);
+    height: var(--knob-size);
+    border-radius: 50%;
+    -webkit-box-shadow: inset calc(var(--knob-size) * 0.48) calc(var(--knob-size) * -0.16) 0px 0px var(--light);
+    box-shadow: inset calc(var(--knob-size) * 0.48) calc(var(--knob-size) * -0.16) 0px 0px var(--light);
+    background-color:var(--dark);
+    -webkit-transition: 0.3s;
+    transition: 0.3s;
+}
+
+.checkbox:checked ~ .slider::before {
+    -webkit-transform: translateX(var(--knob-translate));
+    -ms-transform: translateX(var(--knob-translate));
+    transform: translateX(var(--knob-translate));
+    background-color: var(--dark);
+    -webkit-box-shadow: none;
+    box-shadow: none;
+}
+/* --- settings Cog --- */
+
+/* --- profile Icon --- */
+
+/* --- Main Content --- */
+
 #main-content {
-    margin-left: 220px;
+    margin-left: 10rem;
     padding: 20px;
 }
 
@@ -139,23 +235,26 @@ body{
 #dashboard-tiles {
     display: flex;
     flex-wrap: wrap;
-    gap: 2rem;
     align-items: flex-start;
-    justify-content: flex-start;
-    margin-bottom: 2rem;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0 4rem;
     min-width: 0; /* Prevent overflow */
     overflow-x: auto; /* Allow horizontal scrolling if needed */
+    box-sizing: border-box;
+    min-height: 60%; /* Ensure a minimum height for the tiles area */
 }
 
 .modular-block {
+    min-width: 220px;
+    max-width: 600px;
+    flex: 0 1 300px;
     border-radius: 12px;
-    background-color: var(--bg-card, #fff);
+    background: var(--bg-card, #fff);
     box-shadow: var(--shadow, 0 2px 12px rgba(0, 0, 0, 0.17));
     padding: 1.5rem 2rem;
     margin-bottom: 1.5rem;
-    min-width: 220px; /* Minimum width for each block */
-    flex: 1 1 220px; /* Allow blocks to grow and shrink */
-    transition: box-shadow 0.2s;
+    transition: box-shadow 0.2s, order 0.2s;
     display: flex;
     flex-direction: column;
 }
@@ -178,17 +277,6 @@ body{
     max-width: 250px; /* limit max width for small blocks */
 }
 
-.modular-block-left {
-    align-self: flex-start; /* Align left */
-    text-align: left;
-}
-
-.modular-block-right {
-    align-self: flex-end; /* Align right */
-    text-align: right;
-}
-
-.modular-block-center {
-    align-self: center; /* Center alignment */
-    text-align: center;
-}
+.modular-block-left { order: 1;}
+.modular-block-center { order: 2; }
+.modular-block-right { order: 3; }
