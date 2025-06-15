@@ -1,0 +1,10 @@
+{# modular blocks used for tiling window management #}
+{% macro modular_block(title, content, side="centre", size="medium") %}
+<div class="modular-block modular-block-{{ side }} modular-block-{{ size }}">
+    <h2 class="modular-block-title">{{ title }}</h2>
+    <div class="modular-block-content">
+        {{ content }}
+    </div>
+</div>
+{% endmacro %}
+

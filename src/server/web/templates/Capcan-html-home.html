@@ -1,22 +1,12 @@
 {% extends "base.html" %}
+{% from "components/modular_block.html" import modular_block %}
+
 {% block title %} Dashboard - Capcan {% endblock %}
 {% block content %}
     <h1>Welcome to the Capcan Dashboard</h1>
-    <h3>Quick Stats</h3>
-    <div id="quickstats-container">
-        <table id="quickstats-table">
-            <tbody>
-                <tr>
-                    <th>🧑‍💻 Total Clients</th>
-                    <td>{{ total_clients }}</td>
-                </tr>
-                <th style="color: #27ae60;">🟢 Online</th>
-                <td>{{ online_clients }}</td>
-                <tr>
-                    <th style="color: c0392b;">🔴 Offline</th>
-                    <td>{{ offline_clients }}</td>
-                </tr>
-            </tbody>
-        </table>
+    <div id="dashboard-tiles">
+        {{ modular_block("Quick Stats", quickstats_html, "left", "large") }}
+        {{ modular_block("Recent Activity", activity_html, "right", "medium") }}
+        {{ modular_block("System Health", activity_html, "center", "small") }}
     </div>
 {% endblock %}

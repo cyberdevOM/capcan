@@ -1,17 +1,35 @@
-body, html {
+:root {
+    --bg-main: #f4f8fb;
+    --bg-card: #fff;
+    --text-main: #222;
+    --text-secondary: #34495e;
+    --shadow: 0 2px 12px rgba(0, 0, 0, 0.17);
+}
+
+body{
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
+    background: var(--bg-main);
+    color: var(--text-main);
 }
 
 #sidebar {
-    width: 200px;
-    background: #222;
-    color: #fff;
+    width: 150px;
+    background: var(--bg-card);
+    color: var(--text-main);
     position: fixed;
     height: 100%;
     padding: 0;
     top: 0;
+}
+
+#sidebar h1 {
+    text-align: center;
+    padding: 20px 20px 0px 20px;
+    font-size: 1.5rem;
+    margin: 0;
+    color: var(--bg-card);
 }
 
 #sidebar h2 {
@@ -27,7 +45,7 @@ body, html {
 }
 
 #sidebar ul li a {
-    color: #fff;
+    color: var(--bg-card);
     text-decoration: none;
 }
 
@@ -36,13 +54,15 @@ body, html {
     padding: 20px;
 }
 
+/* --- DashBoard --- */
+
 #quickstats-container {
     max-width: 400px;
     margin: 2rem 0;
     padding: 1.5rem 2rem;
-    background: #fff;
+    background: var(--bg-card);
     border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.17);
+    box-shadow: var(--shadow);
 }
 
 #quickstats-table {
@@ -56,10 +76,119 @@ body, html {
     text-align: left;
     font-weight: 600;
     padding-right: 32px;
-    color: #34495e;
+    color: var(--text-secondary);
     letter-spacing: 0.02em;
     background: none;
     border: none;
 }
 
+/* --- Client --- */
 
+#client-table-container {
+    max-width: 700px;
+    margin: 2rem 0;
+    padding: 1.5rem 2rem;
+    background: var(--bg-card);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+#client-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 12px;
+    font-size: 1.05rem;
+}
+
+#client-table th {
+    text-align: left;
+    font-weight: 700;
+    padding-right: 32px;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+    background: none;
+    border: none;
+}
+
+#client-table td {
+    text-align: left;
+    background: var(--bg-main);
+    border-radius: 6px;
+    padding: 8px 18px;
+    border: none;
+}
+
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+.status-dot.online {
+    background: #27ae60; /* Green */
+}
+.status-dot.offline {
+    background: #c0392b; /* Red */
+}
+
+
+/* --- Dynamic Tiling --- */
+
+#dashboard-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    align-items: flex-start;
+    justify-content: flex-start;
+    margin-bottom: 2rem;
+    min-width: 0; /* Prevent overflow */
+    overflow-x: auto; /* Allow horizontal scrolling if needed */
+}
+
+.modular-block {
+    border-radius: 12px;
+    background-color: var(--bg-card, #fff);
+    box-shadow: var(--shadow, 0 2px 12px rgba(0, 0, 0, 0.17));
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
+    min-width: 220px; /* Minimum width for each block */
+    flex: 1 1 220px; /* Allow blocks to grow and shrink */
+    transition: box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+.modular-block-large {
+    flex-basis: 400px; /* Larger blocks take more space */
+    min-width: 350px; /* Ensure larger blocks have a minimum width */
+    max-width: 600px; /* limit max width for larger blocks */
+}
+
+.modular-block-medium {
+    flex-basis: 300px; /* Medium blocks take moderate space */
+    min-width: 250px; /* Ensure medium blocks have a minimum width */
+    max-width: 400px; /* limit max width for medium blocks */
+}
+
+.modular-block-small {
+    flex-basis: 200px; /* Smaller blocks take less space */
+    min-width: 180px; /* Ensure small blocks have a minimum width */
+    max-width: 250px; /* limit max width for small blocks */
+}
+
+.modular-block-left {
+    align-self: flex-start; /* Align left */
+    text-align: left;
+}
+
+.modular-block-right {
+    align-self: flex-end; /* Align right */
+    text-align: right;
+}
+
+.modular-block-center {
+    align-self: center; /* Center alignment */
+    text-align: center;
+}

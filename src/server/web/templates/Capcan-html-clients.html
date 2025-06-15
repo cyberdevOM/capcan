@@ -10,22 +10,23 @@
                 <th>Platform</th>
                 <th>Status</th>
             </tr>
-    </table>
-    <tbody>
-            {% for client in clients %}
-            <tr>
-                <td>{{ client.id }}</td>
-                <td>{{ client.platform|capitalize }}</td>
-                <td>
-                    {% if client.status == "online" %}
-                        <span class="status-dot online"></span> Online
-                    {% else %}
-                        <span class="status-dot offline"></span> Offline
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
+        </thead>
+        <tbody>
+                {% for client in clients %}
+                <tr>
+                    <td>{{ client.id }}</td>
+                    <td>{{ client.platform|capitalize }}</td>
+                    <td>
+                        {% if client.status == "online" %}
+                            <span class="status-dot online"></span> Online
+                        {% else %}
+                            <span class="status-dot offline"></span> Offline
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </tbody>
-    </tbody>
+    </table>
 </div>
 {% endblock %}
