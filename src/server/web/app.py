@@ -30,5 +30,13 @@ def Clients():
 def Settings():
     return render_template('Capcan-html-settings.html')
 
+@app.route('/login')
+def Login():
+    return render_template('Capcan-html-login.html')
+
+@app.route('/register')
+def Register():
+    return render_template('Capcan-html-register.html')
+
 # if __name__ == '__main__':
     # app.run(debug=True)
