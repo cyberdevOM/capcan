@@ -4,16 +4,9 @@ const userData = {
     profilePicture: null // change to the actual profile picture URL if available
 };
 
-function isTouchDevice() {
-    return window.matchMedia('(hover: none)').matches ||
-            window.matchMedia('(pointer: coarse)').matches ||
-            'ontouchstart' in window;
-}
-
-
-function initializeProfileIcon() {
-    const profileIcon = document.getElementById('profileIcon');
-    const loginMenu = document.getElementById('loginMenu');
+function setupProfileIcon(iconId, menuId) {
+    const profileIcon = document.getElementById(iconId);
+    const loginMenu = document.getElementById(menuId);
 
     if (!profileIcon) {
         console.error('Profile icon element not found');
@@ -39,8 +32,9 @@ function initializeProfileIcon() {
             profileIcon.style.backgroundImage = '';
             profileIcon.innerHTML = initials;
         }
-
-        loginMenu.style.display = 'none';
+        if (loginMenu) {
+            loginMenu.style.display = 'none';
+        }
 
         profileIcon.onclick = function() {
             window.location.href = '/settings'; // Redirect to profile page (change settings to profile once added)
@@ -55,53 +49,71 @@ function initializeProfileIcon() {
             loginMenu.classList.remove('show');
         }
 
-
-        if (isTouchDevice()) {
-            profileIcon.ontouchstart = function(e) {
-                e.stopPropagation();
-                if (loginMenu) {
-                    loginMenu.classList.toggle('show');
-                }
-            };
-
-            document.addEventListener('click', function(e) {
-                const loginMenu = document.getElementById('loginMenu');
-                const profileIcon = document.getElementById('profileIcon');
-
-                if (!profileIcon.contains(e.target) && !loginMenu.contains(e.target)) {
-                    loginMenu.classList.remove('show');
-                }
-            });
-        } else {
-
-            profileIcon.onclick = null;
-
-            let hoverTimeout;
-            const profileContainer = document.querySelector('.profile-container');
-
-            if (profileContainer) {
-                profileContainer.addEventListener('mouseleave', function() {
-                    hoverTimeout = setTimeout(() => {
-                        if (loginMenu) {
-                            loginMenu.classList.remove('show');
-                        }
-                    }, 100);
-                });
-
-                profileContainer.addEventListener('mouseenter', function() {
-                    clearTimeout(hoverTimeout);
-                });
+        profileIcon.onclick = function(e) {
+            e.stopPropagation(); // Prevent event bubbling
+            if (loginMenu) {
+                loginMenu.classList.toggle('show');
+            } else {
+                console.error('Login menu element not found');
             }
-        }
-        
+        };
+
+        document.addEventListener('click', function(e) {
+            const profileContainer = document.querySelector('.profile-container');
+            if (loginMenu && !profileContainer.contains(e.target)) {
+                loginMenu.classList.remove('show');
+            }
+        });
     }
 }
 
-// Initialize the profile icon when the page loads
-document.addEventListener('DOMContentLoaded', initializeProfileIcon);
+function initializeProfileIcon() {
+    // Set up the profile icon for the sidebar
+    setupProfileIcon('sidebarProfileIcon', 'sidebarLoginMenu');
+    // Set up the profile icon for the top bar
+    setupProfileIcon('topbarProfileIcon', 'topbarLoginMenu');
+}
 
-// Re initialize if screen size changes (Desktop ~ Mobile)
-window.addEventListener('resize', function() {
-    this.clearTimeout(this.window.resizeTimeout);
-    this.window.resizeTimeout = this.setTimeout(initializeProfileIcon, 250);
-})
+function initializeHamburgerMenu() {
+    const hamburgerToggle = document.querySelector('.hamburger input[type="checkbox"]');
+    const collapsedOptions = document.getElementById('collapsedOptions');
+
+    // Ensure the hamburger toggle and collapsed options are present
+    if (!hamburgerToggle || !collapsedOptions) {
+        console.error('Element Not Found');
+        return;
+    }
+    
+    // Initialize the hamburger menu toggle
+    hamburgerToggle.addEventListener('change', function() {
+        if (this.checked) {
+            collapsedOptions.classList.add('show');
+        } else {
+            collapsedOptions.classList.remove('show');
+        }        
+    });
+
+    // Close the hamburger menu when clicking outside of it
+    document.addEventListener('click', function(e) {
+        const hamburgerContainer = document.getElementById('topBarOptionsCollapsed');
+        if (!hamburgerContainer.contains(e.target) && !collapsedOptions.contains(e.target)) {
+            hamburgerToggle.checked = false;
+            collapsedOptions.classList.remove('show');
+        }
+    });
+
+    // Close the hamburger menu when clicking on a link
+    const navItems = collapsedOptions.querySelectorAll('.mobile-icon-link');
+    navItems.forEach(item => {
+        item.addEventListener('click', function() {
+            hamburgerToggle.checked = false;
+            collapsedOptions.classList.remove('show');
+        });
+    });
+}
+
+// Initialize the profile icon when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initializeProfileIcon();
+    initializeHamburgerMenu();
+});
