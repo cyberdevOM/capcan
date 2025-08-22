@@ -1,4 +1,9 @@
 {% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ url_for('static', filename='Capcan-css-clients.css') }}">
+{% endblock %}
+
 {% block title %} Client - Capcan {% endblock %}
 {% block content %}
 <h2>Clients</h2>

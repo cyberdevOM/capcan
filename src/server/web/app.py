@@ -1,4 +1,4 @@
-from flask import Flask, render_template, url_for 
+from flask import Flask, render_template, url_for
 import os, importlib.util
 
 file_path = os.path.abspath(
@@ -12,11 +12,19 @@ spec.loader.exec_module(dashboard_preprender)
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
 @app.route('/')
+@app.route('/dashboard')
 def Dashboard():
-    quickstats_html = dashboard_preprender.render_quickstats()
+    context = {
+        'quickstats_html': dashboard_preprender.render_quickstats(),
+        'recent_activity_html': dashboard_preprender.render_recent_activity(),
+        'system_health_html': dashboard_preprender.render_system_health(),
+        'network_status_html': dashboard_preprender.render_network_status(),
+        'alerts_html': dashboard_preprender.render_alerts(),
+    }
+
     return render_template(
         'Capcan-html-home.html',
-        quickstats_html=quickstats_html,
+        **context
     )
 
 @app.route('/clients')

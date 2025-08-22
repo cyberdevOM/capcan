@@ -68,8 +68,6 @@ function setupProfileIcon(iconId, menuId) {
 }
 
 function initializeProfileIcon() {
-    // Set up the profile icon for the sidebar
-    setupProfileIcon('sidebarProfileIcon', 'sidebarLoginMenu');
     // Set up the profile icon for the top bar
     setupProfileIcon('topbarProfileIcon', 'topbarLoginMenu');
 }
@@ -112,8 +110,33 @@ function initializeHamburgerMenu() {
     });
 }
 
+function initializeMasonryLayout() {
+    const grid = document.getElementById('dashboardTiles');
+    if (grid) {
+        const masonry = new Masonry(grid, {
+            itemSelector: '.modular-block',
+            columnWidth: '.modular-block-xs', // Use the smallest block size as the column width
+            gutter: 16,
+            fitWidth: true,
+            transitionDuration: '0.3s'
+        });
+
+        // Reload layout on window resize
+        const observer = new MutationObserver(() => {
+            masonry.reloadItems();
+            masonry.layout();
+        });
+
+        observer.observe(grid, { 
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
 // Initialize the profile icon when the page loads
 document.addEventListener('DOMContentLoaded', function() {
     initializeProfileIcon();
     initializeHamburgerMenu();
+    initializeMasonryLayout();
 });

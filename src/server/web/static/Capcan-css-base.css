@@ -1,0 +1,505 @@
+:root {
+    /* === Light Mode Colors === */
+    --bg-main: #f4f8fb;
+    --bg-card: #fff;
+    --text-main: #222;
+    --text-secondary: #34495e;
+    --shadow: 0 2px 12px rgba(0, 0, 0, 0.17);
+
+    /* === Sidebar Settings === */
+    --sidebar-extended-width: 140px;
+    --sidebar-collapsed-width: 60px; /* Width when sidebar is collapsed */
+
+    /* === Icon Colors === */
+    --icon-color: #222; /*placeholder*/
+    --icon-color-hover: #34495e; /*placeholder*/
+}
+
+body.dark-mode {
+    /* === Dark Mode Colors === */
+    --bg-main: #1a1a1a;
+    --bg-card: #2c2c2c;
+    --text-main: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+
+    /* === Sidebar Settings === */
+    --sidebar-extended-width: 140px; /* Keep the same width for dark mode */
+    --sidebar-collapsed-width: 60px; /* Keep the same width for dark mode */
+
+    /* === Icon Colors === */
+    --icon-color: #fff; /*placeholder*/
+    --icon-color-hover: #f0f0f0; /*placeholder*/
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: var(--bg-main);
+    color: var(--text-main);
+}
+
+/* --- Top Bar --- */
+.top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3rem; /* Height of the top bar */
+    background: var(--bg-card);
+    box-shadow: var(--shadow);
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 0 1rem;
+    z-index: 200; /* Ensure it appears above other content */
+    box-sizing: border-box; /* Include padding in width calculation */
+
+    container: top-bar; /* Make this a container for container queries */
+    container-type: inline-size; /* Make it a container for inline size */
+}
+
+.top-bar-logo-wrapper {
+    height: 100%;
+    min-width: 4vw; /* Minimum width for the logo area */
+    max-width: 20vw; /* Maximum width for the logo area */
+    
+    flex: 0 0 auto; /* Prevent shrinking */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem; /* Space between logo and text */
+
+}
+
+.top-bar-logo-wrapper .logo {
+    display: flex;
+    align-items: left;
+    justify-content: center;
+    padding: 0 0.5rem 0 0; /* Add some padding */
+    height: 100%;
+}
+
+.logo .logo-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+} 
+.logo .logo-text a {
+    color: var(--text-main);
+    text-decoration: none; /* Remove underline */
+    font-size: 1.4rem;
+    font-weight: bold;
+    margin-top: 0.2rem;
+}
+
+.top-bar-options-wrapper{
+    height: 100%;
+    flex: 1; /* Take up remaining space */
+    display: flex;
+    align-items: center;
+    justify-content: flex-end; /* Align items to the right */
+    gap: 1rem;
+
+    container: top-bar-options-wrapper; /* Make this a container for container queries */
+    container-type: inline-size; /* Make it a container for inline size */
+
+}
+
+.top-bar-options-wrapper .options {
+    display: flex;
+    align-items: center;
+    gap: 1rem; /* Space between options */
+    padding: 0 1rem; /* Add some padding */
+}
+
+.options .options-container {
+    list-style: none;
+    padding: 0;
+    margin: 0.2rem 0 0 0; /* Add some margin to the bottom */
+    display: flex;
+    gap: 1rem;
+}
+
+.options .option-item {
+    font-size: 1.2rem;
+    font-weight: 600;
+}.option-item:hover {
+    color: var(--text-secondary);
+    scale: 1.05; /* Slightly enlarge on hover */
+    transition: all 0.2s ease;
+    text-shadow: var(--shadow);
+}.option-item:active {
+    color: var(--text-secondary);
+    scale: 0.9; /* Slightly shrink on click */
+    transition: all 0.1s ease;
+    text-shadow: var(--shadow);
+}
+
+.options .option-item a {
+    text-decoration: none;
+    color: inherit; /* Inherit color from parent */
+    text-align: center; /* Center text */
+}
+
+.top-bar-options-wrapper .options-right {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem; /* Space between right options */
+}
+
+.options-right .profile-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.options-right .profile-container .login-menu {
+    top: calc(100% + 0.5rem);
+    left: calc(50% - 60px);
+}
+
+/* --- settings Cog --- */
+.settings-button { /* Shared styles for button and link, centers button */
+    background: none;
+    border: none;
+    transition: all 0.2s ease;
+    padding: 0.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    /* Center the icon */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.options-right .settings-cog {
+    /* layout */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 32px;
+    height: 32px;
+
+    /* coloring and interaction */
+    background: transparent;
+    border: none;
+    color: var(--icon-color);
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.settings-cog:hover {
+    transform: rotate(45deg);
+    color: var(--icon-color-hover);
+}
+
+/* --- profile Icon --- */
+.profile-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.profile-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.profile-icon:hover {
+    border-color: var(--icon-color-hover);
+    color: var(--icon-color-hover);
+    scale: 1.1;
+}
+
+/* Default Profile Icon */
+.profile-icon.photo {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Guest icon */
+.profile-icon.guest {
+    background: transparent; /* Force red background for guest */
+    color: var(--icon-color);
+    font-size: 1.8rem;
+}
+
+.profile-icon.guest i {
+    color: inherit;
+} /* Match icon color with parent */
+
+.profile-icon.initials {
+    background: var(--icon-color);
+    color: var(--bg-card);
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.login-menu {
+    position: absolute;
+    background: var(--bg-card);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 0.5rem 0;
+    min-width: 120px;
+    z-index: 200;
+    /* Default hidden state */
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none; /* Prevent interaction when hidden */
+    visibility: hidden; /* Ensure it's not visible */
+    transition: opacity 0.2s ease 0.2s, transform 0.2s ease 0.2s, visibility 0s linear 0.3s;
+}
+
+.login-menu.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto; /* Allow interaction when visible */
+    visibility: visible; /* Make it visible */
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: var(--icon-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: background 0.2s ease;
+}
+
+.menu-item:hover {
+    background: var(--bg-main);    
+}
+
+.menu-icon {
+    margin-right: 0.5rem;
+    font-size: 1rem;
+}
+
+/* --- Responsive Design Menu --- */
+.top-bar-options-collapsed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0;
+    right: 1rem;
+    width: 3rem; /* Width when sidebar is collapsed */
+    height: 100%;
+    z-index: 201;
+
+    container: top-bar-options-collapsed; /* Make this a container for container queries */
+    container-type: inline-size; /* Make it a container for inline size */
+}
+
+.top-bar-options-collapsed .hamburger {
+    cursor: pointer;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: inherit; /* Width of the hamburger icon */
+    height: 100%;
+    z-index: 202;
+}
+
+.hamburger input {
+    display: none; /* Hide the checkbox */
+}
+
+.hamburger svg {
+    height: inherit; /* Height of the hamburger icon */
+    transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hamburger svg .line {
+    fill: none;
+    stroke: var(--icon-color);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 3;
+    transition: stroke-dasharray 600ms cubic-bezier(0.4, 0, 0.2, 1),
+                stroke-dashoffset 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hamburger svg .line-top-bottom {
+    stroke-dasharray: 12 63;
+}
+
+.hamburger input:checked + svg {
+    transform: rotate(-45deg);
+}
+
+.hamburger input:checked + svg .line-top-bottom {
+    stroke-dasharray: 20 300;
+    stroke-dashoffset: -32.42;
+}
+
+.mobile-dropdown {
+    position: fixed;
+    top: calc(3rem + 0.5rem);
+    right: 1rem;
+    background: var(--bg-card);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 0.5rem;
+    z-index: 198;
+    /* Default hidden state */
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none; /* Prevent interaction when hidden */
+    visibility: hidden; /* Ensure it's not visible */
+    transition: all 0.3s ease;
+}
+
+.mobile-dropdown.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto; /* Allow interaction when visible */
+    visibility: visible; /* Make it visible */
+}
+
+.mobile-icon-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.mobile-icon-menu .mobile-icon-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 1.25rem;
+    color: var(--icon-color);
+    text-decoration: none;
+    font-size: 2rem;
+    transition: background 0.2s ease;
+    border-radius: 4px;
+    margin: 0;
+}
+
+.mobile-icon-link i {
+    font-size: 2rem;
+}
+
+/* --- Media Queries for Responsive Design --- */
+
+@media (hover: none) and (pointer: coarse) {
+    /* Definitely mobile - no hover, touch input */
+    .top-bar-options-wrapper { display: none !important; }
+    .top-bar-options-collapsed { display: flex !important; }
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 128mm) {
+    /* Definitely desktop - mouse input, hover capable, large screen */
+    .top-bar-options-wrapper { display: flex !important; }
+    .top-bar-options-collapsed { display: none !important; }
+}
+
+/* Edge cases - small desktop windows or large tablets */
+@media (hover: hover) and (pointer: fine) and (max-width: 127mm) {
+    /* Desktop browser made very narrow */
+    .top-bar-options-wrapper { display: none !important; }
+    .top-bar-options-collapsed { display: flex !important; }
+}
+
+
+/* --- Main Content --- */
+
+.main-content {
+    margin-left: 0; /* margin left 140px for sidebar 0 for top bar */
+    margin-top: 3rem; /* Main content margin top 3rem 0 for sidebar*/
+    padding: 0.5rem 1.5rem 0 1.5rem; /* Main content padding (KEEP)*/
+}
+
+.hidden {
+    display: none;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* --- Modular Blocks --- */
+
+.modular-block {
+    box-sizing: border-box;
+
+    border-radius: 12px;
+    background: var(--bg-card, #fff);
+    box-shadow: var(--shadow, 0 2px 12px rgba(0, 0, 0, 0.17));
+    padding: 1.5rem 2rem;
+    margin-bottom: 1rem;
+    transition: box-shadow 0.2s, order 0.2s;
+
+    display: flex;
+    flex-direction: column;
+}
+
+/* 5 column grid system (desktop default) */
+.modular-block-xl { width: calc(100% - 0.5rem); } /* spans all*/
+.modular-block-large { width: calc(80% - 0.4rem); } /* spans 4/5 */
+.modular-block-medium { width: calc(60% - 0.3rem); } /* spans 3/5 */
+.modular-block-small { width: calc(40% - 0.2rem); } /* spans 2/5 */
+.modular-block-xs { width: calc(20% - 0.1rem); } /* spans 1/5 */
+
+.modular-block-title {
+    margin: 0 0 1rem 0;
+    color: var(--text-main);
+    font-size: 1.4rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--bg-main);
+    padding-bottom: 0.5rem;
+    text-decoration: none;
+}
+
+.modular-block-content {
+    flex: 1; /* Take up remaining space */
+    overflow: auto; /* Enable scrolling if content overflows */
+}
+
+@media (max-width: 1200px) {
+    /* 4 columns on smaller desktops */
+    .modular-block-xl { width: calc(100% - 0.5rem); } 
+    .modular-block-large { width: calc(100% - 0.5rem); } 
+    .modular-block-medium { width: calc(75% - 0.375rem); } 
+    .modular-block-small { width: calc(50% - 0.25rem); } 
+    .modular-block-xs { width: calc(25% - 0.125rem); } 
+}
+
+@media (max-width: 900px) {
+    /* 3 columns on tablets */
+    .modular-block-xl { width: calc(100% - 0.5rem); } 
+    .modular-block-large { width: calc(100% - 0.5rem); } 
+    .modular-block-medium { width: calc(100% - 0.5rem); } 
+    .modular-block-small { width: calc(66.66% - 0.33rem); } 
+    .modular-block-xs { width: calc(33.33% - 0.17rem); } 
+}
+
+@media (max-width: 600px) {
+    /* 2 columns on mobile */
+    .modular-block { width: calc(50% - 0.25rem) !important; }
+}
+
+@media (max-width: 400px) {
+    /* 1 column on very small mobile */
+    .modular-block { width: calc(100% - 0.5rem) !important; }
+}
+

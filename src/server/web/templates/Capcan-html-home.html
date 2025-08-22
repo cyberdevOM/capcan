@@ -1,12 +1,18 @@
 {% extends "base.html" %}
 {% from "components/modular_block.html" import modular_block %}
 
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ url_for('static', filename='Capcan-css-home.css') }}">
+{% endblock %}
+
 {% block title %} Dashboard - Capcan {% endblock %}
 {% block content %}
-    <h1>Welcome to the Capcan Dashboard</h1>
-    <div id="dashboard-tiles">
-        {{ modular_block("Quick Stats", quickstats_html, "center", "medium") }}
-        {{ modular_block("Recent Activity", activity_html, "left", "medium") }}
-        {{ modular_block("System Health", activity_html, "right", "small") }}
+    <h1 class="dashboard-title">Welcome to the Capcan Dashboard</h1>
+    <div class="dashboard-tiles" id="dashboardTiles">
+        {{ modular_block("Recent Activity", recent_activity_html, "large") }}
+        {{ modular_block("System Health", system_health_html, "medium") }}
+        {{ modular_block("Quick Stats", quickstats_html, "small") }}
+        {{ modular_block("Network Status", network_status_html, "xs") }}
+        {{ modular_block("Alerts", alerts_html, "small") }}
     </div>
 {% endblock %}
