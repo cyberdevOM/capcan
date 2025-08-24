@@ -1,0 +1,157 @@
+.settings-title {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0.5rem 3rem 2rem 3rem;
+    color: var(--text-main);
+}
+
+.settings-grid {
+    /* using Masonry.js for layout */
+    margin: 0 3rem;
+    box-sizing: border-box;
+}
+
+/* --- Settings Item Styles --- */
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--bg-main);
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+.setting-info {
+    flex: 1;
+}
+
+.setting-label {
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.25rem;
+}
+
+.setting-description {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.setting-control {
+    margin-left: 1rem;
+}
+
+/* --- Toggle Switch Styles --- */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-main);
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.input:checked + .toggle-slider {
+    background-color: #27ae60;
+}
+
+.input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+/* --- Dropdown Styles --- */
+.setting-select {
+    padding: 0.5rem;
+    border: 1px solid var(--bg-main);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--text-main);
+    min-width: 120px;
+}
+
+/* --- Color Picker Styles --- */
+.theme-picker {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.theme-option {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.theme-option.active {
+    background-color: var(--text-main);
+    transform: scale(1.1);
+}
+
+.theme-blue { background: linear-gradient(135deg, #3498db, #2980b9); }
+.theme-green { background: linear-gradient(135deg, #27ae60, #229954); }
+.theme-purple { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+.theme-orange { background: linear-gradient(135deg, #f39c12, #e67e22); }
+
+/* --- Setting Group --- */
+.setting-group {
+    margin-bottom: 1.5rem;
+}
+
+.setting-group-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--bg-main);
+}
+
+/* --- Dashboard card Toggles --- */
+.card-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.card-toggle-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: var(--bg-card);
+    border-radius: 6px;
+}

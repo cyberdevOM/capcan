@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 {% block title %} Settings - Capcan {% endblock %}
+{% from "components/modular_block.html" import modular_block %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ url_for('static', filename='Capcan-css-settings.css') }}">
+{% endblock %}
+
 {% block content %}
-    <h1>Settings</h1>
-    <p>Settings page comming soon!</p>
+    <h1 class="settings-title">Settings</h1>
+
+    <div class="settings-grid" id="settingsGrid">
+        {{ modular_block("Dashboard", dashboard_settings_html, "medium") }}
+        {{ modular_block("Appearance", appearance_settings_html, "medium") }}
+        <!-- {{ modular_block("Client Systems", client_settings_html, "large") }}
+        {{ modular_block("Notifications", notification_settings_html, "small") }}
+        {{ modular_block("Security & Users", security_settings_html, "small") }}
+        {{ modular_block("Advanced", advanced_settings_html, "medium") }} -->
+    </div>
 {% endblock %}

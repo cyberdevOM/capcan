@@ -1,14 +1,23 @@
 from flask import Flask, render_template, url_for
 import os, importlib.util
 
+# Import the dashboard pre-rendering module
 file_path = os.path.abspath(
     os.path.join(os.path.dirname(__file__), './templates/pre_renders/dashboard_prerender.py')
 )
-
 spec = importlib.util.spec_from_file_location("dashboard_prerender", file_path)
 dashboard_preprender = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(dashboard_preprender)
 
+# Import the settings pre-rendering module
+file_path = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), './templates/pre_renders/settings_prerender.py')
+)
+spec = importlib.util.spec_from_file_location("settings_prerender", file_path)
+settings_preprender = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(settings_preprender)
+
+# Initialize the Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
 @app.route('/')
@@ -36,7 +45,15 @@ def Clients():
 
 @app.route('/settings')
 def Settings():
-    return render_template('Capcan-html-settings.html')
+    context = {
+        'dashboard_settings_html': settings_preprender.render_dashboard_settings(),
+        'appearance_settings_html': settings_preprender.render_appearance_settings(),
+    }
+
+    return render_template(
+        'Capcan-html-settings.html',
+        **context
+    )
 
 @app.route('/login')
 def Login():
