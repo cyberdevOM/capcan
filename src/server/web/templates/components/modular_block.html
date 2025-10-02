@@ -1,6 +1,6 @@
 {# modular blocks used for tiling window management #}
 {% macro modular_block(title, content, size="medium") %}
-<div class="modular-block modular-block-{{ size }}">
+<div class="modular-block modular-block-{{ size }}" id="{{ title | replace(' ', '-') }}">
     {% if title %}
     <h2 class="modular-block-title">{{ title }}</h2>
     {% endif %}

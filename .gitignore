@@ -1,4 +1,3 @@
 Unused-*
 src/server/__pycache__
 src/server/web/templates/pre_renders/__pycache__
-*.txt
