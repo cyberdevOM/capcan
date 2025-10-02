@@ -10,9 +10,9 @@
     <h1 class="dashboard-title">Welcome to the Capcan Dashboard</h1>
     <div class="dashboard-tiles" id="dashboardTiles">
         {{ modular_block("Recent Activity", recent_activity_html, "large") }}
-        {{ modular_block("System Health", system_health_html, "medium") }}
-        {{ modular_block("Quick Stats", quickstats_html, "small") }}
+        {{ modular_block("System Health", system_health_html, "small") }}
+        {{ modular_block("Quick Stats", quickstats_html, "xs") }}
         {{ modular_block("Network Status", network_status_html, "xs") }}
-        {{ modular_block("Alerts", alerts_html, "small") }}
+        {{ modular_block("Alerts", alerts_html, "medium") }}
     </div>
 {% endblock %}

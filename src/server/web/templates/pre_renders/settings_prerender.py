@@ -5,41 +5,43 @@ def render_dashboard_settings():
     html = """
     <div class="setting-group">
         <div class="card-toggle-grid">
-            <div class="card-toggle-item">
-                <span> Recent Activity </span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggleRecentActivity" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="card-toggle-item">
-                <span> System Health </span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggleSystemHealth" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="card-toggle-item">
-                <span> Quick Stats </span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggleQuickStats" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="card-toggle-item">
-                <span> Network Status </span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggleNetworkStatus" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="card-toggle-item">
-                <span> Alerts </span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggleAlerts" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
+            <ul class="settings-list">
+                <li class="card-toggle-item">
+                    <span> Recent Activity </span>
+                    <label class="switch">
+                        <input type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </li>
+                <li class="card-toggle-item">
+                    <span> System Health </span>
+                    <label class="switch">
+                        <input type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </li>
+                <li class="card-toggle-item">
+                    <span> Quick Stats </span>
+                    <label class="switch">
+                        <input type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </li>
+                <li class="card-toggle-item">
+                    <span> Network Status </span>
+                    <label class="switch">
+                        <input type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </li>
+                <li class="card-toggle-item">
+                    <span> Alerts </span>
+                    <label class="switch">
+                        <input type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </li>
+            </ul>
         </div>
     </div>
     """
@@ -54,10 +56,10 @@ def render_appearance_settings():
                 <div class="setting-label">Dark Mode</div>
                 <div class="setting-description">Switch between light and dark themes.</div>
             </div>
-            <div class="setting-control">
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggleDarkMode">
-                    <span class="toggle-slider"></span>
+            <div class="card-toggle-item">
+                <label class="switch">
+                    <input type="checkbox">
+                    <span class="slider"></span>
                 </label>
             </div>
         </div>
@@ -67,7 +69,7 @@ def render_appearance_settings():
                 <div class="setting-label">Color Theme</div>
                 <div class="setting-description">Choose your preferred color theme.</div>
             </div>
-            <div class="setting-control">
+            <div class="card-toggle-item">
                 <div class="theme-picker">
                     <div class="theme-option theme-blue active" data-theme="blue"></div>
                     <div class="theme-option theme-green" data-theme="green"></div>
