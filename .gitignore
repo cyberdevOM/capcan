@@ -1,3 +1,4 @@
 Unused-*
-src/server/__pycache__
+**/__pycache__
+**/*.pyc
 src/server/web/templates/pre_renders/__pycache__
