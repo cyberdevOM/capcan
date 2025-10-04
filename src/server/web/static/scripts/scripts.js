@@ -111,7 +111,7 @@ function initializeHamburgerMenu() {
 }
 
 function initializeMasonryLayout() {
-    const grid = document.getElementById('dashboardTiles');
+    const grid = document.getElementById('TilesGrid')
     if (grid) {
         const masonry = new Masonry(grid, {
             itemSelector: '.modular-block',

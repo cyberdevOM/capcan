@@ -8,7 +8,7 @@
 {% block title %} Dashboard - Capcan {% endblock %}
 {% block content %}
     <h1 class="dashboard-title">Welcome to the Capcan Dashboard</h1>
-    <div class="dashboard-tiles" id="dashboardTiles">
+    <div class="dashboard-tiles" id="TilesGrid">
         {{ modular_block("Recent Activity", recent_activity_html, "large") }}
         {{ modular_block("System Health", system_health_html, "small") }}
         {{ modular_block("Quick Stats", quickstats_html, "xs") }}

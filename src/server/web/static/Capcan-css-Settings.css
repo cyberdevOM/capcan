@@ -45,7 +45,7 @@
  --button-width: 2.5rem;
  --button-height: 1.2rem;
  --toggle-diameter: 0.8rem;
- --button-toggle-offset: calc((var(--button-height) - var(--toggle-diameter)) / 2);
+ --button-toggle-offset: calc((var(--button-height) - var(--toggle-diameter)) / 2.2);
  --toggle-shadow-offset: 10px;
  --toggle-wider: 3em;
  --color-grey: #cccccc;
@@ -162,4 +162,47 @@
     padding: 0 1rem 0.5rem 0;
     background: var(--bg-card);
     border-radius: 6px;
+}
+
+/* --- Password Inputs --- */
+.input-group {
+    display: flex;
+    line-height: 30px;
+    align-items: center;
+    position: relative;
+    max-width: 200px;
+
+    margin: 0 0.5rem 0.5rem 0;
+}
+
+.input-group .input {
+  width: 100%;
+  height: 45px;
+  line-height: 30px;
+  padding-left: 3rem;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  outline: none;
+  background-color: #f8fafc;
+  color: #0d0c22;
+  transition: .5s ease;
+}
+
+.input-group .input::placeholder {
+  color: #94a3b8;
+}
+
+.input-group .input:focus, .input-group .input:hover {
+  outline: none;
+  border-color: rgba(129, 140, 248);
+  background-color: #fff;
+  box-shadow: 0 0 0 5px rgb(129 140 248 / 30%);
+}
+
+.icon {
+  position: absolute;
+  left: 1rem;
+  fill: none;
+  width: 1rem;
+  height: 1rem;
 }

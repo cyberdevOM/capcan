@@ -48,6 +48,9 @@ def Settings():
     context = {
         'dashboard_settings_html': settings_preprender.render_dashboard_settings(),
         'appearance_settings_html': settings_preprender.render_appearance_settings(),
+        'client_settings_html': settings_preprender.render_client_settings(),
+        'security_settings_html': settings_preprender.render_security_settings(),
+        'notification_settings_html': settings_preprender.render_notification_settings(),
     }
 
     return render_template(
