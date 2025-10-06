@@ -2,9 +2,12 @@
     /* === Light Mode Colors === */
     --bg-main: #f4f8fb;
     --bg-card: #fff;
+    --bg-card-hover: #eeeeee;
     --text-main: #222;
     --text-secondary: #34495e;
+    --text-hover: #373d42;
     --shadow: 0 2px 12px rgba(0, 0, 0, 0.17);
+
 
     /* === Sidebar Settings === */
     --sidebar-extended-width: 140px;

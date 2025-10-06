@@ -1,35 +1,89 @@
-#client-table-container {
-    max-width: 700px;
-    margin: 2rem 0;
-    padding: 1.5rem 2rem;
-    background: var(--bg-card);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-}
-
-#client-table {
+.client-container {
+    display: flex;
+    align-items: center;
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0 12px;
-    font-size: 1.05rem;
+    height: 100%;
 }
 
-#client-table th {
-    text-align: left;
-    font-weight: 700;
-    padding-right: 32px;
-    color: var(--text-main);
-    letter-spacing: 0.02em;
-    background: none;
+.client-list-container {
+    width: 25%;
+    height: 100%;
+    border-right: solid 3px Black;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.client-search-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    height: 2.5rem;
+    box-sizing: border-box;
+    position: relative;
+}
+.client-search-container .client-search {
+    height: 2.5rem;
+    width: 100%;
+
+}
+.client-search-container .client-filter {
+    width: 2.5rem;
+    height: 2.5rem;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: transparent;
     border: none;
-}
-
-#client-table td {
-    text-align: left;
-    background: var(--bg-main);
     border-radius: 6px;
-    padding: 8px 18px;
-    border: none;
+    transition: background-color 0.2s ease;
+}
+
+.client-search-container .client-filter:hover {
+    background: var(--text-secondary);
+}
+
+/* -- Client Search input -- */
+.search-label {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-card);
+  padding: 9px 45px 9px 9px;
+  cursor: text;
+}
+
+.search-label:hover {
+  border-color: var(--bg-card-hover);
+}
+
+.search-label:focus-within {
+  background: var(--bg-card-hover);
+  border-color: var(--text-secondary);
+}
+
+.search-label input {
+  outline: none;
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--text-main);
+}
+
+.search-label input:focus+.slash-icon,
+.search-label input:valid+.slash-icon {
+  display: none;
 }
 
 .status-dot {
