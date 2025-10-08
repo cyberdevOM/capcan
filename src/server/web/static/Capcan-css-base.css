@@ -1,13 +1,62 @@
 :root {
-    /* === Light Mode Colors === */
-    --bg-main: #f4f8fb;
-    --bg-card: #fff;
-    --bg-card-hover: #eeeeee;
+            /* === Light Mode Colors === */
+    /* === Background Colors === */
+    --bg-main: #ebf5fd;
+    --bg-card: #f5fbff;
+    --bg-card-hover: #ccd8dd;
+    --bg-card-border: #222;
+    --bg-card-border-hover: #34495e;
+
+    /* === Text Colors === */
     --text-main: #222;
     --text-secondary: #34495e;
-    --text-hover: #373d42;
-    --shadow: 0 2px 12px rgba(0, 0, 0, 0.17);
+    --text-hover: #19183b;
+    --text-active: #708993;
 
+    /* === Shadows === */
+    --shadow: 0 2px 12px rgba(0, 0, 0, 0.17);
+    --shadow-secondary: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    /* === Icon Colors === */
+    --icon-primary: #222;
+    --icon-secondary: #142a30;
+    --icon-hover: #344d66;
+    --icon-active: #5eabbe;
+
+    /* === Button Colors === */
+    --button-primary-bg: #3498db;
+    --button-primary-bg-hover: #2980b9;
+    --button-primary-text: #ebf5fd;
+    --button-primary-border: rgba(41, 128, 185, 0.3);
+
+    --button-secondary-bg: #ecf0f1;
+    --button-secondary-bg-hover: #bdc3c7;
+    --button-secondary-text: #2c3e50;
+    --button-secondary-border: rgba(44, 62, 80, 0.3);
+
+    --button-disabled-bg: #bdc3c7; /*placeholder*/
+    --button-disabled-text: #7f8c8d; /*placeholder*/
+
+    --button-danger-bg: rgba(192, 57, 43, 0.1);
+    --button-danger-bg-hover: rgba(192, 57, 43, 0.2);
+    --button-danger-text: #c0392b;
+    --button-danger-border: rgba(192, 57, 43, 0.3);
+
+    /* === Input Field Colors === */
+    --input-primary-bg: #fff; /*placeholder*/
+    --input-primary-border: #ccc; /*placeholder*/
+    --input-primary-border-focus: #1abc9c; /*placeholder*/
+    --input-primary-text: #2c3e50; /*placeholder*/
+
+    --input-secondary-bg: #ecf0f1; /*placeholder*/
+    --input-secondary-border: #bdc3c7; /*placeholder*/
+    --input-secondary-border-focus: #16a085; /*placeholder*/
+    --input-secondary-text: #2c3e50; /*placeholder*/
+
+    --input-placeholder-text: #7f8c8d; /*placeholder*/
+    
+    --input-disabled-bg: #bdc3c7; /*placeholder*/
+    --input-disabled-text: #7f8c8d; /*placeholder*/
 
     /* === Sidebar Settings === */
     --sidebar-extended-width: 140px;
@@ -22,7 +71,7 @@ body.dark-mode {
     /* === Dark Mode Colors === */
     --bg-main: #1a1a1a;
     --bg-card: #2c2c2c;
-    --text-main: #e0e0e0;
+    --text-main: #e2e2e2;
     --text-secondary: #b0b0b0;
     --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 

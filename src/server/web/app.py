@@ -1,21 +1,11 @@
 from flask import Flask, render_template, url_for
-import os, importlib.util
+import os, sys
 
-# Import the dashboard pre-rendering module
-file_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), './templates/pre_renders/dashboard_prerender.py')
-)
-spec = importlib.util.spec_from_file_location("dashboard_prerender", file_path)
-dashboard_preprender = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(dashboard_preprender)
+sys.path.insert(0, os.path.dirname(__file__))
 
-# Import the settings pre-rendering module
-file_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), './templates/pre_renders/settings_prerender.py')
-)
-spec = importlib.util.spec_from_file_location("settings_prerender", file_path)
-settings_preprender = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(settings_preprender)
+from templates.pre_renders import dashboard_prerender
+from templates.pre_renders import clients_prerender
+from templates.pre_renders import settings_prerender
 
 # Initialize the Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -24,11 +14,11 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 @app.route('/dashboard')
 def Dashboard():
     context = {
-        'quickstats_html': dashboard_preprender.render_quickstats(),
-        'recent_activity_html': dashboard_preprender.render_recent_activity(),
-        'system_health_html': dashboard_preprender.render_system_health(),
-        'network_status_html': dashboard_preprender.render_network_status(),
-        'alerts_html': dashboard_preprender.render_alerts(),
+        'quickstats_html': dashboard_prerender.render_quickstats(),
+        'recent_activity_html': dashboard_prerender.render_recent_activity(),
+        'system_health_html': dashboard_prerender.render_system_health(),
+        'network_status_html': dashboard_prerender.render_network_status(),
+        'alerts_html': dashboard_prerender.render_alerts(),
     }
 
     return render_template(
@@ -38,19 +28,23 @@ def Dashboard():
 
 @app.route('/clients')
 def Clients():
+    context = {
+        'client_list_html': clients_prerender.render_client_list(),
+        'client_details_html': clients_prerender.render_client_details(),
+    }
     return render_template(
-        'Capcan-html-clients.html', 
-        clients=dashboard_preprender.export_client_list()
+        'Capcan-html-clients.html',
+        **context
     )
 
 @app.route('/settings')
 def Settings():
     context = {
-        'dashboard_settings_html': settings_preprender.render_dashboard_settings(),
-        'appearance_settings_html': settings_preprender.render_appearance_settings(),
-        'client_settings_html': settings_preprender.render_client_settings(),
-        'security_settings_html': settings_preprender.render_security_settings(),
-        'notification_settings_html': settings_preprender.render_notification_settings(),
+        'dashboard_settings_html': settings_prerender.render_dashboard_settings(),
+        'appearance_settings_html': settings_prerender.render_appearance_settings(),
+        'client_settings_html': settings_prerender.render_client_settings(),
+        'security_settings_html': settings_prerender.render_security_settings(),
+        'notification_settings_html': settings_prerender.render_notification_settings(),
     }
 
     return render_template(
