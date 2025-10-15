@@ -1,61 +1,73 @@
-# Project CapCan
+## Project overview: Capcan - Host-based Intrusion Detection system and Management Framework
 
-## What is CapCan
-CapCan is a cross platform Honeypot automation tool, It is designed as a Server/Client application that will deploy and report on honeypots distributed 
-by the client platforms.
+[Documentation]()
+[Installation]()
+[github](https://github.com/cyberdevOM/capcan)
 
-## Project Scope
-CapCan Should be able to perform the following tasks:
-1. create and distribute dynamic system packages to clients based off of systems needs and operational scope.
-2. clients should be able to destribute Predefined HoneyPot Packages to its host system, and detect access to these files.
-3. Diferentiate between regular system health checkins and Honeypot alerts.
-4. Identify different alerts and provide information to the dashboard in relation to that alert.
-5. mask the Process ID of client application to avoid detection by automated tools
-6. log incidents in a locally managed centralised database
+**Goal**:
+Project Capcan is a host-based intrusion detection system designed to provide proactive security monitoring across distributed client systems. Capcan integrates multiple TTPs to detect suspicious or malicious activity, each client node collects and reports telemetry data to a centralised server, which aggregates, analyses, visualizes events through a web-based interface.
 
-## Architechtual Design Breakdown
-### Server
-- **Web Interface (Flask/Django)**:
-    - control and conduct deployment of Client processes
-    - view alerts, system logs and Client status
-    - Perform remote actions on client machines
-- **Database (PostgreSQL)**:
-    - Collect and store logs
-    - alerts and client/system data.
-- **Log Ingestion (Logstash/Fluentd)**:
-    - Normalise cross platform logs 
-    - feed log data into analysis pipelines
-- **Security Monitoring (Snort)**:
-    - IDS/IPS other basic Security monitoring solutions
-- **Alerting (SMTP/API)**:
-    - Email SMTP alterts for non critical alerts
-    - Teams &/or slack for critical alerts along with dashboard alerts while a user of analyst or higher logged in
-- **Visualisation (plotly/dash/matplotlib)**:
-    - Graphs on access trends for network and client individual
-    - threat heatmaps
-    - alert graphs with Severity and risk models
+**Objectives**:
+- Deploy lightweight client agents to systems that monitor for suspicious activity in real time.
+- Employ multiple detection strategies, (Process monitoring, filesystem activity tracking, log inspection and network behaviour analysis).
+- Report security events and telemetry data to a central Capcan server for analysis.
+- Provide administrators with an accessible web UI for alerting, visualization and response.
+- Maintain low resource usage while enabling scalability across large environments.
 
-### Client
-- **Deploy HoneyFiles**:
-    - text Docs.
-    - db stubs.
-    - log files.
-- **Monitor file access**:
-    - pollinng.
-    - file system hooks.
-- **mask process id**:
-    - Hide/mask process id and name when enabled.
-- **Auto-Start**:
-    - on boot.
-    - registary.
-    - services.
-- **check ins**:
-    - on boot.
-    - one a day/6hrs.
-    - on shutdown.
-- **Relay alerts**:
-    - relay alerts when honey files are accessed.
-    - alert when file system modified in abnormal way.
-    - alert when abnormal login.
-    
-### Author: notdedyet
+---
+### System Components
+1. **Client Agent**
+	- Deployable as a single package (.deb, .rpm, Windows installer planned)
+	- installs system-level hooks for monitoring user activity, filesystem changes, process execution, and network calls.
+	- Supports Honey-file deployment for deception-based detection.
+	- Reports telemetry and alerts back to the central server using secure communication.
+2. **Central Server**
+	- Manages client configurations and builds deployment packages.
+	- Collects incoming telemetry and intrusion alerts.
+	- Provides correlation and severity scoring for reported events.
+	- Exposes a web-based management dashboard for administrators.
+	- Sends alerts via integrated channels (Slack, Teams, email, in-app notifications).
+3. **Web Interface (UI)**
+	- Displays system health, alerts, and forensic data.
+	- includes visualization tools for intrusion trends, activity graphs, and client statistic.
+	- Supports administrator actions such as pushing updated configurations or triggering audits.
+
+---
+### Detection Methodologies (TTPs)
+- **Deception**: Honey-files and imitation assets to detect unauthorized access.
+- **File Integrity Monitoring**: Watching for creation, modification, and deletion of key files. 
+- **Process Monitoring**: Detection suspicious or unauthorized processes running on the host.
+- **Log Inspection**: Parsing system logs for intrusion indicators.
+- **Network Monitoring**: identifying anomalous outbound connections from clients.
+
+---
+### Alerting & Reporting
+- Centralized aggregation of alerts with severity classification.
+- Real-time alerts to administrators via API-integration channels.
+- Historical logging for audits and forensic investigations.
+
+---
+
+### Technology stack & Frameworks 
+- **Programming Language**: Python (for both client agents and server backend)
+- **Web Framework**: Flask (server side application and REST API)
+- **Database**: PostgreSQL (centralized storage of telemetry, alerts, and configurations)
+- **Message & Log Handling**: Logstash or fluentd (for structured log ingestion).
+- **Visualization**: Plotly/Dash or Grafana (Interactive alert and event dashboards).
+- **Packaging & Deployment**:
+	- Pyinstaller for client-side binaries
+	- .deb and .rpm build systems for linux distributions
+	- future support for Windows MSI installer
+- **Alert integrations**: Slack SDK Microsoft Teams SDK, SMTP for email notifications.
+
+---
+### Planned future expansions
+- migrate client agents to RUST for performance and security
+- Integration with existing SIEM platforms.
+- Cross-platform support for windows and macOS in addition to Linux.
+- Automated remediation capabilities (quarantine processes, lock accounts etc.).
+- machine learning integration to better calculate risk and severity.
+
+---
+## Impact
+Capcan will provide a unified, flexible, and extensible approach to host-based intrusion detection. By combining deception techniques with traditional HIDS monitoring and centralizing the dataflow into a streamlined web interface, it empowers administrators to detect, analyse, and respond to intrusion quickly and effectively.
