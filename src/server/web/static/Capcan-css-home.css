@@ -2,14 +2,27 @@
 .dashboard-title {
     font-size: 2rem;
     font-weight: bold;
-    margin: 0.5rem 3rem;
+    margin: 0.5rem clamp(1rem, 4vw, 3rem); /* Responsive margins (fix laptop overflow)*/
     color: var(--text-main);
+}
+
+.grid-sizer {
+    width: 20%; /* Base size for Masonry grid items */
+    height: 0;
+    visibility: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 
 .dashboard-tiles {
     /* using Masonry.js for layout */
-    margin: 0 3rem;
+    margin: 0;
     box-sizing: border-box;
+    max-width: 100%;
+    overflow: hidden;
+
+    width: 100%;
 }
 
 /* --- Dashboard Modular Block Content --- */
@@ -227,3 +240,5 @@
 .status-dot.idle {
     background: #f39c12; /* Yellow */
 }
+
+

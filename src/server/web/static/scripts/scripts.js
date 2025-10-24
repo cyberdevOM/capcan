@@ -113,24 +113,71 @@ function initializeHamburgerMenu() {
 function initializeMasonryLayout() {
     const grid = document.getElementById('TilesGrid') || document.querySelector('.masonry-grid')
     if (grid) {
+        if (!grid.querySelector('.grid-sizer')) {
+            const gridSizer = document.createElement('div');
+            gridSizer.className = 'grid-sizer';
+            grid.appendChild(gridSizer);
+        }
+
         const masonry = new Masonry(grid, {
             itemSelector: '.modular-block',
-            columnWidth: '.modular-block-xs', // Use the smallest block size as the column width
-            gutter: 16,
-            fitWidth: true,
+            columnWidth: '.grid-sizer',
+            percentPosition: true,
+            gutter: 20,
+            fitWidth: false, // Let CSS handle width
+            resize: true,
             transitionDuration: '0.3s'
         });
+
+        // Force correct width calc
+        function adjustGridWidth() {
+            const mainContent = grid.closest('.main-content');
+            if (mainContent) {
+                const mainContentStyles = getComputedStyle(mainContent);
+                const paddingLeft = parseFloat(mainContentStyles.paddingLeft) || 0;
+                const paddingRight = parseFloat(mainContentStyles.paddingRight) || 0;
+                
+                const availableWidth = mainContent.clientWidth - paddingLeft - paddingRight;
+                
+                grid.style.width = '100%';
+                grid.style.maxWidth = `${availableWidth}px`;
+
+                console.log(`Adjusted grid width to ${availableWidth}px`);
+            }
+        }
+
+        // Apply width fix after Masonry layout Complete
+        masonry.on('layoutComplete', () => {
+            adjustGridWidth();
+        });
+
+        // Handle Window Resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                adjustGridWidth();
+                masonry.layout();
+            }, 250); // Debounce resize events
+        });
+
+        // Initial adjustment
+        setTimeout(adjustGridWidth, 100);
 
         // Reload layout on window resize
         const observer = new MutationObserver(() => {
             masonry.reloadItems();
             masonry.layout();
+            setTimeout(adjustGridWidth, 50); // Adjust width after layout
         });
 
         observer.observe(grid, {
             childList: true,
             subtree: true
         });
+
+
+        window.masonryInstance = masonry; // Expose for debugging
     }
 }
 
