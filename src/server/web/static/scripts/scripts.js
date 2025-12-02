@@ -111,74 +111,41 @@ function initializeHamburgerMenu() {
 }
 
 function initializeMasonryLayout() {
-    const grid = document.getElementById('TilesGrid') || document.querySelector('.masonry-grid')
-    if (grid) {
-        if (!grid.querySelector('.grid-sizer')) {
-            const gridSizer = document.createElement('div');
-            gridSizer.className = 'grid-sizer';
-            grid.appendChild(gridSizer);
-        }
+    const grid = document.getElementById('TilesGrid');
+    
+    if (!grid) {
+        console.log('No TilesGrid found');
+        return;
+    }
 
+    // Clear any existing grid sizers
+    const existingSizers = grid.querySelectorAll('.grid-sizer');
+    existingSizers.forEach(sizer => sizer.remove());
+
+    // Add grid sizer
+    const gridSizer = document.createElement('div');
+    gridSizer.className = 'grid-sizer';
+    grid.appendChild(gridSizer);
+
+    // Wait for CSS to load then initialize
+    setTimeout(() => {
         const masonry = new Masonry(grid, {
             itemSelector: '.modular-block',
             columnWidth: '.grid-sizer',
+            gutter: 16,
             percentPosition: true,
-            gutter: 20,
-            fitWidth: false, // Let CSS handle width
-            resize: true,
-            transitionDuration: '0.3s'
+            fitWidth: false
         });
 
-        // Force correct width calc
-        function adjustGridWidth() {
-            const mainContent = grid.closest('.main-content');
-            if (mainContent) {
-                const mainContentStyles = getComputedStyle(mainContent);
-                const paddingLeft = parseFloat(mainContentStyles.paddingLeft) || 0;
-                const paddingRight = parseFloat(mainContentStyles.paddingRight) || 0;
-                
-                const availableWidth = mainContent.clientWidth - paddingLeft - paddingRight;
-                
-                grid.style.width = '100%';
-                grid.style.maxWidth = `${availableWidth}px`;
-
-                console.log(`Adjusted grid width to ${availableWidth}px`);
-            }
-        }
-
-        // Apply width fix after Masonry layout Complete
-        masonry.on('layoutComplete', () => {
-            adjustGridWidth();
-        });
-
-        // Handle Window Resize
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                adjustGridWidth();
-                masonry.layout();
-            }, 250); // Debounce resize events
-        });
-
-        // Initial adjustment
-        setTimeout(adjustGridWidth, 100);
-
-        // Reload layout on window resize
-        const observer = new MutationObserver(() => {
-            masonry.reloadItems();
+        // Force layout
+        setTimeout(() => {
             masonry.layout();
-            setTimeout(adjustGridWidth, 50); // Adjust width after layout
-        });
+            console.log('Masonry layout complete');
+        }, 100);
 
-        observer.observe(grid, {
-            childList: true,
-            subtree: true
-        });
-
-
-        window.masonryInstance = masonry; // Expose for debugging
-    }
+        // Store for debugging
+        window.masonryInstance = masonry;
+    }, 200);
 }
 
 function initializeSettings() {
@@ -307,9 +274,268 @@ function initializeClientSearch() {
 
 // Initialize the profile icon when the page loads
 document.addEventListener('DOMContentLoaded', function () {
-    initializeProfileIcon();
-    initializeHamburgerMenu();
-    initializeMasonryLayout();
-    initializeSettings();
-    initializeClientSearch();
+    initializeProfileIcon(); // Profile icon functionality
+    initializeHamburgerMenu(); // Hamburger menu functionality
+    initializeMasonryLayout(); // Masonry layout for dashboard
+    initializeSettings(); // Settings page functionality
+    initializeClientSearch(); // Client search functionality
+    initializeDebugGrid(); // Debugging helpers
 });
+
+/// === DEBUGGING HELPERS === ///
+
+let debugMenuVisible = false;
+
+function initializeDebugGrid() {
+    // Only enable debug in development
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        document.body.classList.add('debug-mode');
+        createDebugControls();
+        createViewportInfo();
+        setupDebugToggle();
+    }
+}
+function setupDebugToggle() {
+    document.addEventListener('keydown', function(e) {
+        // Press Ctrl+Shift+D to toggle debug menu
+        if (e.ctrlKey && e.shiftKey && e.code === 'KeyD') {
+            e.preventDefault();
+            toggleDebugMenu();
+        }
+    });
+}
+
+function toggleDebugMenu() {
+    const debugControls = document.querySelector('.debug-controls');
+    const viewportInfo = document.querySelector('.viewport-info');
+    
+    debugMenuVisible = !debugMenuVisible;
+    
+    if (debugMenuVisible) {
+        debugControls?.classList.add('visible');
+        viewportInfo?.classList.add('visible');
+        console.log('🔧 Debug menu enabled (Ctrl+Shift+D to toggle)');
+    } else {
+        debugControls?.classList.remove('visible');
+        viewportInfo?.classList.remove('visible');
+        // Also disable any active debug modes
+        document.body.classList.remove('debug-grid');
+        document.querySelectorAll('.debug-controls button.active').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        console.log('🔧 Debug menu disabled');
+    }
+}
+
+function createDebugControls() {
+    const debugControls = document.createElement('div');
+    debugControls.className = 'debug-controls';
+    
+    // Get current page name
+    const pageName = document.title.split(' - ')[0] || 'Unknown';
+    
+    debugControls.innerHTML = `
+        <h4>DEBUG (${pageName})</h4>
+        <button id="toggleGridDebug">Grid</button>
+        <button id="toggleMasonryDebug">Order</button>
+        <button id="showGridSizes">Sizes</button>
+        <button id="highlightOverflow">Overflow</button>
+        <button id="showBreakpoints">BP</button>
+    `;
+    
+    document.body.appendChild(debugControls);
+
+    // Event listeners
+    document.getElementById('toggleGridDebug').addEventListener('click', toggleGridDebug);
+    document.getElementById('toggleMasonryDebug').addEventListener('click', toggleMasonryDebug);
+    document.getElementById('showGridSizes').addEventListener('click', logGridSizes);
+    document.getElementById('highlightOverflow').addEventListener('click', highlightOverflow);
+    document.getElementById('showBreakpoints').addEventListener('click', showBreakpoints);
+}
+
+function createViewportInfo() {
+    const viewportInfo = document.createElement('div');
+    viewportInfo.className = 'viewport-info';
+    document.body.appendChild(viewportInfo);
+    
+    updateViewportInfo();
+    window.addEventListener('resize', updateViewportInfo);
+}
+
+function updateViewportInfo() {
+    const info = document.querySelector('.viewport-info');
+    if (info) {
+        const gridContainer = document.getElementById('TilesGrid') || 
+                             document.querySelector('.dashboard-tiles') || 
+                             document.querySelector('.settings-grid') ||
+                             document.querySelector('.client-container');
+        
+        const blockCount = document.querySelectorAll('.modular-block').length;
+        
+        info.innerHTML = `
+            ${window.innerWidth}×${window.innerHeight}<br>
+            ${getCurrentBreakpoint()}<br>
+            ${getGridColumns()}<br>
+            ${blockCount} blocks<br>
+            ${gridContainer ? 'Grid: ✓' : 'Grid: ✗'}
+        `;
+    }
+}
+
+function getCurrentBreakpoint() {
+    const width = window.innerWidth;
+    if (width <= 400) return 'XS (≤400px)';
+    if (width <= 600) return 'SM (≤600px)';
+    if (width <= 900) return 'MD (≤900px)';
+    if (width <= 1200) return 'LG (≤1200px)';
+    if (width <= 1440) return 'XL (≤1440px)';
+    return 'XXL (>1440px)';
+}
+
+function getGridColumns() {
+    const width = window.innerWidth;
+    if (width <= 400) return '1 col';
+    if (width <= 600) return '2 col';
+    if (width <= 900) return '3 col';
+    if (width <= 1200) return '4 col';
+    return '5 col';
+}
+
+function toggleGridDebug() {
+    const body = document.body;
+    const button = document.getElementById('toggleGridDebug');
+    
+    if (body.classList.contains('debug-grid')) {
+        body.classList.remove('debug-grid');
+        button.classList.remove('active');
+    } else {
+        body.classList.add('debug-grid');
+        button.classList.add('active');
+    }
+}
+
+function toggleMasonryDebug() {
+    // Find the actual grid container that exists on this page
+    const container = document.getElementById('TilesGrid') || 
+                     document.querySelector('.dashboard-tiles') || 
+                     document.querySelector('.settings-grid');
+    
+    const button = document.getElementById('toggleMasonryDebug');
+    
+    if (!container) {
+        console.log('No grid container found on this page');
+        return;
+    }
+    
+    const items = container.querySelectorAll('.modular-block');
+    
+    if (items.length === 0) {
+        console.log('No modular blocks found');
+        return;
+    }
+    
+    items.forEach((item, index) => {
+        if (item.dataset.debugIndex) {
+            delete item.dataset.debugIndex;
+        } else {
+            item.dataset.debugIndex = index + 1;
+        }
+    });
+    
+    button.classList.toggle('active');
+    console.log(`Masonry debug toggled for ${items.length} blocks`);
+}
+
+function logGridSizes() {
+    const blocks = document.querySelectorAll('.modular-block');
+    
+    if (blocks.length === 0) {
+        console.log('No modular blocks found on this page');
+        return;
+    }
+    
+    console.group('🔍 Grid Analysis');
+    console.log(`Found ${blocks.length} blocks on current page`);
+    
+    blocks.forEach((block, index) => {
+        const rect = block.getBoundingClientRect();
+        const sizeClass = Array.from(block.classList)
+            .find(cls => cls.startsWith('modular-block-')) || 'unknown';
+        
+        console.log(`Block ${index + 1}:`, {
+            class: sizeClass,
+            size: `${rect.width.toFixed(0)}×${rect.height.toFixed(0)}px`,
+            percent: `${((rect.width / window.innerWidth) * 100).toFixed(1)}%`,
+            title: block.querySelector('.modular-block-title')?.textContent || 'No title'
+        });
+    });
+    
+    console.groupEnd();
+}
+
+function highlightOverflow() {
+    const button = document.getElementById('highlightOverflow');
+    
+    if (button.classList.contains('active')) {
+        document.querySelectorAll('[data-overflow-debug]').forEach(el => {
+            el.style.removeProperty('outline');
+            delete el.dataset.overflowDebug;
+        });
+        button.classList.remove('active');
+    } else {
+        document.querySelectorAll('*').forEach(el => {
+            if (el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight) {
+                el.style.outline = '2px solid red';
+                el.dataset.overflowDebug = 'true';
+            }
+        });
+        button.classList.add('active');
+    }
+}
+
+function showBreakpoints() {
+    const breakpoints = [400, 600, 900, 1200, 1440];
+    const button = document.getElementById('showBreakpoints');
+    
+    // Remove existing lines
+    document.querySelectorAll('.breakpoint-line').forEach(line => line.remove());
+    
+    if (button.classList.contains('active')) {
+        button.classList.remove('active');
+        return;
+    }
+    
+    breakpoints.forEach((bp, i) => {
+        const line = document.createElement('div');
+        line.className = 'breakpoint-line';
+        line.style.cssText = `
+            position: fixed;
+            left: ${bp}px;
+            top: 0;
+            width: 1px;
+            height: 100vh;
+            background: rgba(255, ${i * 50}, 0, 0.6);
+            z-index: 9999;
+            pointer-events: none;
+        `;
+        
+        const label = document.createElement('div');
+        label.style.cssText = `
+            position: absolute;
+            top: 5px;
+            left: 2px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 1px 3px;
+            font-size: 9px;
+            border-radius: 2px;
+            font-family: monospace;
+        `;
+        label.textContent = `${bp}`;
+        line.appendChild(label);
+        
+        document.body.appendChild(line);
+    });
+    
+    button.classList.add('active');
+}

@@ -496,19 +496,20 @@ body {
 
 .modular-block {
     box-sizing: border-box;
-
     border-radius: 12px;
     background: var(--bg-card, #fff);
     box-shadow: var(--shadow, 0 2px 12px rgba(0, 0, 0, 0.17));
     padding: 1.5rem 2rem;
-    margin-bottom: 1rem;
+    margin-bottom: 16px; /* Match gutter size */
     transition: box-shadow 0.2s, order 0.2s;
-
     display: flex;
     flex-direction: column;
-
-    min-width: 0; /* Fix for overflowing content in flex items */
-    overflow: hidden; /* Hide overflow content */
+    min-width: 0;
+    overflow: hidden;
+    
+    /* Required for masonry */
+    float: left;
+    position: relative;
 }
 
 /* 5 column grid system (desktop default) */
@@ -541,42 +542,292 @@ body {
     }
 }
 
-@media (max-width: 1200px) {
-    .main-content {
-        padding: 0.5rem 0.75rem 0 0.75rem;
-    }
+
+
+/* ====================== DEBUG GRID SETTINGS ============================= */
+
+body.debug-grid .modular-block {
+    position: relative !important;
 }
 
-/* tablet adjustments */
-
-
-
-/* Responsive Modular Block Widths */
-@media (max-width: 1200px) {
-    /* 4 columns on smaller desktops */
-    .modular-block-xl { width: calc(100% - 0.5rem); } 
-    .modular-block-large { width: calc(100% - 0.5rem); } 
-    .modular-block-medium { width: calc(75% - 0.375rem); } 
-    .modular-block-small { width: calc(50% - 0.25rem); } 
-    .modular-block-xs { width: calc(25% - 0.125rem); } 
+body.debug-grid .modular-block::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px dashed #e74c3c;
+    z-index: 1000;
+    pointer-events: none;
+    box-sizing: border-box;
 }
 
-@media (max-width: 900px) {
-    /* 3 columns on tablets */
-    .modular-block-xl { width: calc(100% - 0.5rem); } 
-    .modular-block-large { width: calc(100% - 0.5rem); } 
-    .modular-block-medium { width: calc(100% - 0.5rem); } 
-    .modular-block-small { width: calc(66.66% - 0.33rem); } 
-    .modular-block-xs { width: calc(33.33% - 0.17rem); } 
+body.debug-grid .modular-block::after {
+    content: attr(class);
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    background: #e74c3c;
+    color: white;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    z-index: 1001;
+    border-radius: 0 0 4px 0;
+    pointer-events: none;
+    box-sizing: border-box;
 }
 
-@media (max-width: 600px) {
-    /* 2 columns on mobile */
-    .modular-block { width: calc(50% - 0.25rem) !important; }
+body.debug-grid .dashboard-tiles,
+body.debug-grid .settings-grid,
+body.debug-grid #TilesGrid {
+    position: relative !important;
+    box-shadow: inset 0 0 0 3px #3498db !important;
 }
 
-@media (max-width: 400px) {
-    /* 1 column on very small mobile */
-    .modular-block { width: calc(100% - 0.5rem) !important; }
+body.debug-grid .dashboard-tiles::before,
+body.debug-grid .settings-grid::before,
+body.debug-grid #TilesGrid::before {
+    content: 'GRID CONTAINER';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: #3498db;
+    color: white;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    z-index: 1001;
+    border-radius: 4px;
+    pointer-events: none;
+    box-sizing: border-box;
 }
 
+body.debug-grid .client-container {
+    position: relative !important;
+    box-shadow: inset 0 0 0 3px #e74c3c !important;
+}
+
+body.debug-grid .client-container::before {
+    content: 'CLIENT CONTAINER';
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #e74c3c;
+    color: white;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    z-index: 1001;
+    border-radius: 4px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+body.debug-grid .client-list-container {
+    position: relative !important;
+    box-shadow: inset 0 0 0 2px #f39c12 !important;
+}
+
+body.debug-grid .client-list-container::before {
+    content: 'CLIENT LIST';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    background: #f39c12;
+    color: white;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    z-index: 1000;
+    border-radius: 0 0 4px 0;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+body.debug-grid .client-details {
+    position: relative !important;
+    box-shadow: inset 0 0 0 2px #9b59b6 !important;
+}
+
+body.debug-grid .client-details::before {
+    content: 'CLIENT DETAILS';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #9b59b6;
+    color: white;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    z-index: 1000;
+    border-radius: 0 0 0 4px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+/* Grid size indicators */
+body.debug-grid .modular-block-xl::after { 
+    content: 'XL (100%)';
+    background: #e67e22; 
+}
+body.debug-grid .modular-block-large::after { 
+    content: 'L (80%)';
+    background: #27ae60; 
+}
+body.debug-grid .modular-block-medium::after { 
+    content: 'M (60%)';
+    background: #3498db; 
+}
+body.debug-grid .modular-block-small::after { 
+    content: 'S (40%)';
+    background: #9b59b6; 
+}
+body.debug-grid .modular-block-xs::after { 
+    content: 'XS (20%)';
+    background: #e74c3c; 
+}
+
+body.debug-grid .main-content {
+    position: relative !important;
+    box-shadow: inset 0 0 0 1px #95a5a6 !important;
+}
+
+body.debug-grid .main-content::before {
+    content: 'MAIN CONTENT';
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: #95a5a6;
+    color: white;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    z-index: 999;
+    border-radius: 3px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+/* Debug for page titles */
+body.debug-grid h1,
+body.debug-grid h2 {
+    position: relative !important;
+}
+
+body.debug-grid h1::before,
+body.debug-grid h2::before {
+    content: 'TITLE';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #34495e;
+    color: white;
+    padding: 1px 4px;
+    font-size: 8px;
+    font-weight: bold;
+    z-index: 999;
+    border-radius: 2px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+/* Special handling for masonry debug mode */
+body.debug-grid .modular-block[data-debug-index]::after {
+    content: '#' attr(data-debug-index);
+    background: #2c3e50 !important;
+    color: white;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 8px 12px;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+    min-width: 30px;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Debug controls */
+.debug-controls {
+    position: fixed;
+    top: 70px;
+    right: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    z-index: 9999;
+    font-size: 11px;
+    min-width: 120px;
+    font-family: monospace;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: none; /* Hidden by default */
+}
+
+.debug-controls.visible {
+    display: block;
+}
+
+.debug-controls h4 {
+    margin: 0 0 6px 0;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.debug-controls button {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 4px 6px;
+    margin: 2px 0;
+    border-radius: 2px;
+    cursor: pointer;
+    width: 100%;
+    font-size: 10px;
+    font-family: monospace;
+    transition: background 0.2s;
+}
+
+.debug-controls button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.debug-controls button.active {
+    background: rgba(46, 204, 113, 0.3);
+    border-color: rgba(46, 204, 113, 0.6);
+}
+
+/* Viewport size indicator */
+.viewport-info {
+    position: fixed;
+    top: 70px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 10px;
+    z-index: 9998;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: none; /* Hidden by default */
+}
+
+.viewport-info.visible {
+    display: block;
+}
+
+/* Hide debug in production */
+body:not(.debug-mode) .debug-controls,
+body:not(.debug-mode) .viewport-info {
+    display: none !important;
+}

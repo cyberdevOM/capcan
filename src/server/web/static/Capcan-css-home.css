@@ -8,21 +8,17 @@
 
 .grid-sizer {
     width: 20%; /* Base size for Masonry grid items */
-    height: 0;
-    visibility: hidden;
-    position: absolute;
-    top: 0;
-    left: 0;
 }
 
 .dashboard-tiles {
     /* using Masonry.js for layout */
     margin: 0;
-    box-sizing: border-box;
-    max-width: 100%;
-    overflow: hidden;
+    position: relative;
+}
 
-    width: 100%;
+.modular-block {
+    float: left;
+    margin-bottom: 16px;
 }
 
 /* --- Dashboard Modular Block Content --- */
