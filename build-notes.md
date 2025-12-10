@@ -18,3 +18,6 @@
     4. impliment light and dark mode
 
     5. continue to work on client page and client big view selection
+
+- build backend.
+
