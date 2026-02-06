@@ -165,8 +165,16 @@ def validate_telemetry_data(data: Dict[str, Any]) -> tuple[bool, str]:
             return False, "load_average must be a list of 3 numbers"
         if not all(isinstance(x, (int,float)) for x in value):
             return False, "load_average values must be numbers"
+    
+    # validate uptime_seconds
+    if 'uptime_seconds' in data:
+        value = data['uptime_seconds']
+        if not isinstance(value, int) or value < 0:
+            return False, "uptime_seconds must be a non-negative integer"
         
-        return True, ""
+    return True, ""
+        
+        
     
 # ================= TELEMETRY ENDPOINTS =================
 
@@ -183,7 +191,7 @@ def submit_telemetry():
     {
         "cpu_percent": float,       # CPU usage percentage
         "memory_percent": float,    # Memory usage percentage
-        "memory_available_mb": int, # Available memory in MB
+        "memory_available": int, # Available memory in MB
         "disk_usage": float,        # Disk usage percentage
         "disk_read_bytes": int,     # Disk read bytes since last report
         "disk_write_bytes": int,    # Disk write bytes since last report
@@ -267,7 +275,8 @@ def submit_telemetry():
     
 # ================= GET TELEMETRY HISTORY =================
 
-@telemetry_bp.route('/<client_id>', methods=['GET'])
+@telemetry_bp.route('/<client_id>', methods=['GET']) 
+# this should be a database query not an api endpoint
 def get_telemetry_history(client_id: str):
     """
     Retrieve telemetry history for a specific client.
@@ -363,7 +372,9 @@ def get_telemetry_history(client_id: str):
     
 # ================= Get Latest Telemetry =================
 @telemetry_bp.route('/<client_id>/latest', methods=['GET'])
-def get_latest_telemetry(client_id: str):
+def get_latest_telemetry(client_id: str): 
+    # use submit telemery endpoint func to receive data
+    # send request for data to client an wait for response then process save and display. do not disturb normal cycle
     """
     Get the most recent telemetry snapshot for a client
 
@@ -406,6 +417,7 @@ def get_latest_telemetry(client_id: str):
 
 # ================ Get Telemetry Stats ================
 @telemetry_bp.route('/<client_id>/stats', methods=['GET'])
+# should also be a database query not an api endpoint
 def get_telemetry_stats(client_id: str):
     """
     Get Statical summaries of telemetry data for a client.

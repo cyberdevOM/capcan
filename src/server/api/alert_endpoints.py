@@ -87,7 +87,7 @@ def validate_alert_request(client_id: str) -> tuple[bool, Dict[str, Any], int]:
         }, 401
     
     # Validate timestamp
-    valid_time, time_error = validate_timestamp(timestamp)
+    valid_time, time_error = validate_timestamp(timestamp) ##! IMPLIMENT IN VALIDATORS !
     if not valid_time:
         return False, {"error": f"Invalid timestamp: {time_error}"}, 401
     
