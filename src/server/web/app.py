@@ -1,11 +1,13 @@
-from flask import Flask, render_template, url_for
-import os, sys
+import os
+import sys
+from flask import Flask, render_template
 
-sys.path.insert(0, os.path.dirname(__file__))
 
 from templates.pre_renders import dashboard_prerender
 from templates.pre_renders import clients_prerender
 from templates.pre_renders import settings_prerender
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 # Initialize the Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')

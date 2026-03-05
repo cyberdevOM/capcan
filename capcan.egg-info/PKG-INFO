@@ -1,0 +1,91 @@
+Metadata-Version: 2.4
+Name: capcan
+Version: 0.1.0
+Summary: Client capability and analytics platform
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: Flask==3.1.3
+Requires-Dist: psycopg2-binary>=2.9.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: Werkzeug==3.1.6
+Requires-Dist: Jinja2==3.1.6
+Requires-Dist: click==8.3.1
+Requires-Dist: blinker==1.9.0
+Requires-Dist: pyinstaller==6.19.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+
+## Project overview: Capcan - Host-based Intrusion Detection system and Management Framework
+
+[Documentation]()
+[Installation]()
+[github](https://github.com/cyberdevOM/capcan)
+
+**Goal**:
+Project Capcan is a host-based intrusion detection system designed to provide proactive security monitoring across distributed client systems. Capcan integrates multiple TTPs to detect suspicious or malicious activity, each client node collects and reports telemetry data to a centralised server, which aggregates, analyses, visualizes events through a web-based interface.
+
+**Objectives**:
+- Deploy lightweight client agents to systems that monitor for suspicious activity in real time.
+- Employ multiple detection strategies, (Process monitoring, filesystem activity tracking, log inspection and network behaviour analysis).
+- Report security events and telemetry data to a central Capcan server for analysis.
+- Provide administrators with an accessible web UI for alerting, visualization and response.
+- Maintain low resource usage while enabling scalability across large environments.
+
+---
+### System Components
+1. **Client Agent**
+	- Deployable as a single package (.deb, .rpm, Windows installer planned)
+	- installs system-level hooks for monitoring user activity, filesystem changes, process execution, and network calls.
+	- Supports Honey-file deployment for deception-based detection.
+	- Reports telemetry and alerts back to the central server using secure communication.
+2. **Central Server**
+	- Manages client configurations and builds deployment packages.
+	- Collects incoming telemetry and intrusion alerts.
+	- Provides correlation and severity scoring for reported events.
+	- Exposes a web-based management dashboard for administrators.
+	- Sends alerts via integrated channels (Slack, Teams, email, in-app notifications).
+3. **Web Interface (UI)**
+	- Displays system health, alerts, and forensic data.
+	- includes visualization tools for intrusion trends, activity graphs, and client statistic.
+	- Supports administrator actions such as pushing updated configurations or triggering audits.
+
+---
+### Detection Methodologies (TTPs)
+- **Deception**: Honey-files and imitation assets to detect unauthorized access.
+- **File Integrity Monitoring**: Watching for creation, modification, and deletion of key files. 
+- **Process Monitoring**: Detection suspicious or unauthorized processes running on the host.
+- **Log Inspection**: Parsing system logs for intrusion indicators.
+- **Network Monitoring**: identifying anomalous outbound connections from clients.
+
+---
+### Alerting & Reporting
+- Centralized aggregation of alerts with severity classification.
+- Real-time alerts to administrators via API-integration channels.
+- Historical logging for audits and forensic investigations.
+
+---
+
+### Technology stack & Frameworks 
+- **Programming Language**: Python (for both client agents and server backend)
+- **Web Framework**: Flask (server side application and REST API)
+- **Database**: PostgreSQL (centralized storage of telemetry, alerts, and configurations)
+- **Message & Log Handling**: Logstash or fluentd (for structured log ingestion).
+- **Visualization**: Plotly/Dash or Grafana (Interactive alert and event dashboards).
+- **Packaging & Deployment**:
+	- Pyinstaller for client-side binaries
+	- .deb and .rpm build systems for linux distributions
+	- future support for Windows MSI installer
+- **Alert integrations**: Slack SDK Microsoft Teams SDK, SMTP for email notifications.
+
+---
+### Planned future expansions
+- migrate client agents to RUST for performance and security
+- Integration with existing SIEM platforms.
+- Cross-platform support for windows and macOS in addition to Linux.
+- Automated remediation capabilities (quarantine processes, lock accounts etc.).
+- machine learning integration to better calculate risk and severity.
+
+---
+## Impact
+Capcan will provide a unified, flexible, and extensible approach to host-based intrusion detection. By combining deception techniques with traditional HIDS monitoring and centralizing the dataflow into a streamlined web interface, it empowers administrators to detect, analyse, and respond to intrusion quickly and effectively.
