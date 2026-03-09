@@ -35,7 +35,7 @@ from datetime import datetime, timedelta
 MAX_TIMESTAMP_AGE = 300 # 5 minutes
 VALID_ALGORITHMS = ['sha256'] # Supported HMAC algorithms
 
-def validate_hmac(timestamp: str, max_age: int = MAX_TIMESTAMP_AGE) -> Tuple[bool, str]:
+def validate_timestamp(timestamp: str, max_age: int = MAX_TIMESTAMP_AGE) -> Tuple[bool, str]:
     """
     Validate the provided timestamp to ensure it's within the allowed age.
 

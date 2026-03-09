@@ -1,1 +1,0 @@
-client_id, event_id, event_type, occurred_at, injest_time, payload, tags

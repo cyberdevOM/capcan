@@ -15,6 +15,7 @@ class Database:
                 password=os.getenv("DB_PASSWORD")
             )
             print ("Database connection established.")
+            return self.conn
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
             self.conn = None
@@ -36,5 +37,12 @@ class Database:
             print(error)
             self.conn.rollback()
             print(f"Failed to create web user '{username}'.")
-            
-    def 
+
+
+if __name__ == "__main__":
+    db = Database()
+    if db.conn:
+        print("Database connection test successful.")
+        db.close()
+    else:
+        print("Database connection test failed.")

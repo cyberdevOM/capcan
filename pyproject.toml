@@ -26,12 +26,23 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["src"]
+packages = [
+    "src",
+    "src.server",
+    "src.server.api",
+    "src.server.core",
+    "src.server.models",
+    "src.server.utils",
+    "src.server.web",
+    "src.server.web.templates",
+    "src.server.web.build",
+    "src.client_template",
+]
 
 [tool.setuptools.package-data]
 src = ["**/*.json", "**/*.html", "**/*.css", "**/*.js"]
 
 [tool.pytest.ini_options]
-testpaths = ["src/tests"]
+testpaths = ["./tests"]
 python_files = ["*_test.py", "test_*.py"]
 addopts = "-v --tb=short"

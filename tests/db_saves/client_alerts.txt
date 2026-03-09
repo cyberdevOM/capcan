@@ -1,1 +1,0 @@
-client_id, alert_id, rule_id, severity, score, title, description, status, payload, created_at, acknowledged, resolved, tags
