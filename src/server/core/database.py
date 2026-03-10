@@ -8,34 +8,33 @@ class Database:
         load_env()
         try:
             self.conn = psycopg2.connect(
-                host=os.getenv("BD_HOST"),
-                database=os.getenv("DB_NAME"),
-                port=os.getenv("DB_PORT"),
-                user=os.getenv("DB_USER"),
-                password=os.getenv("DB_PASSWORD")
-            )
-            print ("Database connection established.")
-            return self.conn
+                host=os.getenv("DB_HOST"), port=os.getenv("DB_PORT"), database=os.getenv("DB_NAME"),
+                user=os.getenv("DB_USER"), password=os.getenv("DB_PASSWORD")
+            ) # creates a connection to the database using credentials from environment variables
+            self.cursor = self.conn.cursor() # creates a cursor object for executing SQL commands
+            print("Database connection established successfully.")
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
-            self.conn = None
-            
+            print("Failed to establish database connection.")
+
     def close(self):
         if self.conn:
-            self.conn.close()
+            self.cursor.close() # closes the cursor
+            self.conn.close() # closes the database connection
             print("Database connection closed.")
             
-    def create_web_user(self, username, hash):
+    def create_web_user(self, username, pass_hash):
         try:    
-            self.conn.cursor().execute(
-                "INSERT INTO web_users (username, hash) VALUES (%s, %s);",
-                (username, hash)        
+            self.cursor.execute(
+                "INSERT INTO auth (username, pass_hash) VALUES (%s, %s);",
+                (username, pass_hash)
             )
             self.conn.commit()
             print(f"Web user '{username}' created successfully.")
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
-            self.conn.rollback()
+            if self.conn:
+                self.conn.rollback()
             print(f"Failed to create web user '{username}'.")
 
 
@@ -43,6 +42,5 @@ if __name__ == "__main__":
     db = Database()
     if db.conn:
         print("Database connection test successful.")
-        db.close()
     else:
         print("Database connection test failed.")

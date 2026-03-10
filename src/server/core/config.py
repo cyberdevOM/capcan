@@ -1,44 +1,55 @@
-from database import Database
+from .database import Database as database
+import psycopg2
 
 class Config:
     def __init__(self):
-        self.db = Database()
+        self.db = database()
+        self.conn = self.db.conn
+        self.curs = self.db.cursor
 
-    def __del__(self):
-        if hasattr(self, 'db') and self.db.conn:
-            self.db.close()
-
-    def create_tables(self, db):
+    def create_tables(self):
         try:
-            with db.cursor() as cursor:
-                self.registered_clients(cursor)
-                self.client_telemetry(cursor)
-                self.client_event(cursor)
-                self.client_alert(cursor)
-                self.client_changes(cursor)
-                self.client_configs(cursor)
-            db.commit()
+            self.registered_clients(self.curs)
+            self.client_telemetry(self.curs)
+            self.client_event(self.curs)
+            self.client_alert(self.curs)
+            self.client_changes(self.curs)
+            self.client_configs(self.curs)
+            self.server_details(self.curs)
+            self.auth(self.curs)
+            self.user_permissions(self.curs)
+            self.client_organizations(self.curs)
+            self.notification_integrations(self.curs)
+            self.server_audit_logs(self.curs)
+            self.conn.commit()
             print("Tables created successfully.")
-            close(db)
         except Exception as error:
             print(error)
-            close(db)
-    
-    def create_enums(self, db):
-        try:
-            with db.cursor() as cursor:
-                cursor.execute("CREATE TYPE IF NOT EXISTS STATUS AS ENUM ('active', 'inactive', 'suspended');")
-                cursor.execute("CREATE TYPE IF NOT EXISTS ALERT_SEVERITY AS ENUM ('critical', 'high','medium','low', 'info', 'undefined');")
-                cursor.execute("CREATE TYPE IF NOT EXISTS ALERT_STATUS AS ENUM ('unresolved', 'acknowledged', 'resolved');")
-                cursor.execute("CREATE TYPE IF NOT EXISTS CHANGE_STATUS AS ENUM ('active', 'inactive', 'pending', 'approved', 'rejected');")
-            db.commit()
-            print("Enums created successfully.")
-            db.close(db)
-        except Exception as error:
-            print(error)
-            db.close(db)
+            self.conn.rollback()
 
-    def registered_clients(cursor):
+    def create_enums(self):
+        enums = {
+            "STATUS": "CREATE TYPE STATUS AS ENUM ('active', 'inactive', 'suspended');",
+            "ALERT_SEVERITY": "CREATE TYPE ALERT_SEVERITY AS ENUM ('critical', 'high','medium','low', 'info', 'undefined');",
+            "ALERT_STATUS": "CREATE TYPE ALERT_STATUS AS ENUM ('unresolved', 'acknowledged', 'resolved');",
+            "CHANGE_STATUS": "CREATE TYPE CHANGE_STATUS AS ENUM ('active', 'inactive', 'pending', 'approved', 'rejected');"
+        }
+        try:
+            for enum_name, query in enums.items():
+                try:
+                    self.curs.execute(query)
+                    self.conn.commit()
+                except psycopg2.Error as e:
+                    self.conn.rollback()
+                    if "already exists" in str(e):
+                        print(f"Enum {enum_name} already exists, skipping.")
+                    else:
+                        raise
+            print("Enums created successfully.")
+        except Exception as error:
+            print(error)
+
+    def registered_clients(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS registered_clients (
             client_id VARCHAR(255) PRIMARY KEY NOT NULL,
@@ -53,7 +64,7 @@ class Config:
 
         cursor.execute(query)
 
-    def client_telemetry(cursor):
+    def client_telemetry(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS client_telemetry (
             client_id VARCHAR(255) NOT NULL,
@@ -71,7 +82,7 @@ class Config:
 
         cursor.execute(query)
 
-    def client_event(cursor):
+    def client_event(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS client_events (
             client_id VARCHAR(255) NOT NULL,
@@ -88,7 +99,7 @@ class Config:
 
         cursor.execute(query)
 
-    def client_alert(cursor):
+    def client_alert(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS client_alerts (
             client_id VARCHAR(255),
@@ -111,7 +122,7 @@ class Config:
 
         cursor.execute(query)
 
-    def client_changes(cursor):
+    def client_changes(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS client_changes (
             client_id VARCHAR(255) NOT NULL,
@@ -136,7 +147,7 @@ class Config:
         # add feature to schedual changes for future implementation.
         cursor.execute(query)
 
-    def client_configs(cursor):
+    def client_configs(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS client_configs (
             client_id VARCHAR(255) NOT NULL,
@@ -150,7 +161,7 @@ class Config:
 
         cursor.execute(query)
 
-    def server_details(cursor):
+    def server_details(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS server_details (
             server_id VARCHAR(255) PRIMARY KEY NOT NULL,
@@ -169,7 +180,7 @@ class Config:
 
         cursor.execute(query)
 
-    def auth(cursor):
+    def auth(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS auth (
             user_id VARCHAR(255) PRIMARY KEY NOT NULL,
@@ -179,7 +190,7 @@ class Config:
 
         cursor.execute(query)
 
-    def user_permissions(cursor):
+    def user_permissions(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS user_permissions (
             user_id VARCHAR(255) NOT NULL,
@@ -198,7 +209,7 @@ class Config:
 
         cursor.execute(query)
 
-    def client_organizations(cursor):
+    def client_organizations(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS client_organizations (
             client_id VARCHAR(255) PRIMARY KEY NOT NULL,
@@ -213,7 +224,7 @@ class Config:
 
         cursor.execute(query)
 
-    def notification_integrations(cursor):
+    def notification_integrations(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS notification_integrations (
             integration_id VARCHAR(255) PRIMARY KEY NOT NULL,
@@ -221,13 +232,13 @@ class Config:
             name VARCHAR(255) NOT NULL,
             config JSONB DEFAULT NULL,
             enabled BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
 
         cursor.execute(query)
 
-    def server_audit_logs(cursor):
+    def server_audit_logs(self, cursor):
         query = """
         CREATE TABLE IF NOT EXISTS server_audit_logs (
             audit_id VARCHAR(255) PRIMARY KEY NOT NULL,
@@ -243,9 +254,8 @@ class Config:
 
         cursor.execute(query)
 
-
-
 if __name__ == "__main__": 
     config = Config()
     config.create_enums()
     config.create_tables()
+    config.db.close()
