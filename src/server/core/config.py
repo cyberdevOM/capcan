@@ -55,7 +55,9 @@ class Config:
             client_id VARCHAR(255) PRIMARY KEY NOT NULL,
             client_number SERIAL UNIQUE NOT NULL,
             hostname VARCHAR(255) NOT NULL,
+            client_os VARCHAR(255) DEFAULT NULL,
             description TEXT DEFAULT NULL,
+            client_secret VARCHAR(255) NOT NULL,
             registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             revoked BOOLEAN DEFAULT FALSE,
             notes TEXT DEFAULT NULL
