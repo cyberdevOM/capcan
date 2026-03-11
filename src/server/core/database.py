@@ -47,16 +47,56 @@ class Database:
 
 # ============== CLIENT AUTHENTICATION & SECURITY UTILITIES ==============
     def register_client(self, Client_id, hostname, description, client_secret):
-        pass # register a new client in the database
+        query = """
+        INSERT INTO registered_clients (client_id, hostname, description, client_secret)
+        VALUES (%s, %s, %s, %s);
+        """
+        try:
+            self.cursor.execute(query, (Client_id, hostname, description, client_secret))
+            self.conn.commit()
+            print(f"Client '{hostname}' registered successfully with client_id '{Client_id}'.")
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            print(f"Failed to register client '{hostname}'.")
 
     def revoke_client(self, client_id):
-        pass # mark a client as revoked in the database, preventing future authentication
+        query = """
+        UPDATE registered_clients WHERE client_id = %s
+        SET revoked = TRUE;
+        """
+        try:
+            self.cursor.execute(query, (client_id,))
+            self.conn.commit()
+            print(f"Client with client_id '{client_id}' revoked successfully.")
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            print(f"Failed to revoke client with client_id '{client_id}'.")
 
     def update_client(self, client_id, description=None, secret=None, notes=None):
-        pass # update client information such as description, secret, or notes in the database
-
+        query = """
+        UPDATE registered_clients WHERE client_id = %s
+        """
+        
+        # Dynamically build the SET clause based on which parameters are provided
+        pass
+        
     def delete_client(self, client_id):
-        pass # permanently delete a client from the database
+        query = """
+        DELETE FROM registered_clients WHERE CLIENT_ID = %s CASCADE;
+        """
+        try:
+            self.cursor.execute(query, (client_id,))
+            self.conn.commit()
+            print(f"Client with client_id '{client_id}' deleted successfully.")
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            print(f"Failed to delete client with client_id '{client_id}'.")
 
     def get_client_id(self, client_number=None, hostname=None, client_os=None):
         pass # retrieve client_id from known search parameters like client_number (serial), hostname, OS, etc. 
