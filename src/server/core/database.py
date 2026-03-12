@@ -99,16 +99,43 @@ class Database:
             print(f"Failed to delete client with client_id '{client_id}'.")
 
     def get_client_id(self, client_number=None, hostname=None, client_os=None):
-        pass # retrieve client_id from known search parameters like client_number (serial), hostname, OS, etc. 
+        query = """
+        SELECT client_id FROM registered_clients
+        WHERE
+        """
+        # Dynamically build the WHERE clause based on which parameters are provided
+        pass
+
     
     def get_many_clients(self, filter_params):
         pass # retrieve multiple clients based on filter parameters like OS, registration date, etc.
     
     def get_client_by_id(self, client_id):
-        pass # retrieve all client information based on client_id, used for authentication and client details page
+        query = """
+        SELECT * FROM registered_clients WHERE client_id = %s;
+        """
+        try:
+            self.cursor.execute(query, (client_id,))
+            return self.cursor.fetchone()
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            return None
 
     def get_all_clients(self):
-        pass # retrieve all clients from the database
+        query = """
+        SELECT * FROM registered_clientsl
+        """
+        try:
+            self.cursor.execute(query)
+            return self.cursor.fetchall() # returns a list of all clients in the database
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            return None
+        
 
     def get_client_secret(self, client_id):
         try:
