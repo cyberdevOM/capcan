@@ -57,13 +57,14 @@ class Config:
             hostname VARCHAR(255) NOT NULL,
             client_os VARCHAR(255) DEFAULT NULL,
             description TEXT DEFAULT NULL,
+            version FLOAT DEFAULT 0,
             client_secret VARCHAR(255) NOT NULL,
             registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             revoked BOOLEAN DEFAULT FALSE,
             notes TEXT DEFAULT NULL
         );
         """
-
+        #? Added "version" Tag to identify in client table the client version
         cursor.execute(query)
 
     def client_telemetry(self, cursor):
@@ -109,13 +110,12 @@ class Config:
             rule_id VARCHAR(255) NOT NULL,
             severity ALERT_SEVERITY DEFAULT 'undefined',
             score INTEGER DEFAULT 0,
-            title VARCHAR(255) NOT NULL,
-            description TEXT DEFAULT NULL,
+            event_type VARCHAR(255) NOT NULL,
             status ALERT_STATUS DEFAULT 'unresolved',
-            payload JSONB DEFAULT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            acknowledged BOOLEAN DEFAULT FALSE,
-            resolved BOOLEAN DEFAULT FALSE,
+            acknowledged_at TIMESTAMP DEFAULT NULL,
+            acknowledged_by VARCHAR(255) DEFAULT NULL,
+            created_at TIMESTAMP NOT NULL,
+            details TEXT DEFAULT NULL,
             tags TEXT[] DEFAULT NULL,
 
             FOREIGN KEY (client_id) REFERENCES registered_clients(client_id) ON DELETE CASCADE ON UPDATE CASCADE

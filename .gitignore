@@ -2,3 +2,5 @@ Unused-*
 **/__pycache__
 **/*.pyc
 src/server/web/templates/pre_renders/__pycache__
+.env
+note.md

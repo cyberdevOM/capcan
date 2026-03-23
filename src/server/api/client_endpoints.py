@@ -19,10 +19,14 @@ GET /api/clients/<id> (with auth)
 """
 
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+import datetime as dt
 import secrets
 import uuid
 from typing import Dict, Any
+from ..core.database import Database
+
+# Create a persistent Database instance for API handlers
+database = Database()
 
 # Import security validators
 from ..utils.validators import (
@@ -30,24 +34,16 @@ from ..utils.validators import (
     validate_signature,
     extract_security_headers,
     generate_ack_id,
-    register_client_secret,
-    get_client_secret
 )
 
 # create blueprint for client endpoints
 client_bp = Blueprint('clients', __name__, url_prefix='/api/clients')
 
-# ================ Mock DataStorage =================
-# In production, this would be a database model
 
-MOCK_CLIENTS = {
-
-}
 
 # ================ Helper Functions ==================
 
 def generate_secret_key() -> str:
-    """Generates a cryptographically secure random secret key."""
     return secrets.token_hex(32)  # 256-bit key
 
 def validate_client_request(client_id: str) -> tuple[bool, Dict[str, any], int]:
@@ -73,16 +69,17 @@ def validate_client_request(client_id: str) -> tuple[bool, Dict[str, any], int]:
         return False, {"error": "Client ID mismatch between URL and headers"}, 403
     
     # check client exists
-    if client_id not in MOCK_CLIENTS:
-        return False, {"error": "Client ID not registered"}, 404
+    #! REPLACED WITH DATABASE CALL TO SEE IF CLIENT ID MATCHES CLIENT
+    if not database.get_client_by_id(client_id):
+        return False, {"error": "Client ID Does not exist"}
 
     # validate timestamp and signature
     valid_time, time_errror = validate_timestamp(timestamp)
     if not valid_time:
         return False, {"error": f"Invalid timestamp: {time_errror}"}, 401
     
-    # get client secret
-    secret_key = get_client_secret(client_id)
+    # get client secret from database
+    secret_key = database.get_client_secret(client_id)
     if not secret_key:
         return False, {"error": "Client secret not found - re-register required"}, 401
     
@@ -97,6 +94,7 @@ def validate_client_request(client_id: str) -> tuple[bool, Dict[str, any], int]:
     if not valid_sig:
         return False, {"error": f"Invalid signature: {sig_error}"}, 401
     
+    # NOTE: do not close the shared Database instance here; other handlers may reuse it
     return True, {}, 200
 
 
@@ -130,9 +128,12 @@ def register_client():
     }
     """
 
+    #! Only register clients once aproval is given from the dashboard.
+
     try: 
         # Parse and validate request JSON
-        data = request.get_json()
+        # Use silent=True to avoid raising a BadRequest on empty/malformed JSON
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({"error": "No json data provided"}), 400
         
@@ -150,28 +151,19 @@ def register_client():
         # Generate client ID and secret key
         client_id = str(uuid.uuid4())
         secret_key = generate_secret_key()
-        
-        # Register client secret
-        register_client_secret(client_id, secret_key)
 
-        # Get client IP from request or data (use X-Forwarded-For if behind proxy)
-        ip_address = data.get("ip_address", request.remote_addr)
+        # Validate version if provided, otherwise default to 0.0
+        version = data.get("version", 0.0)
+        try:
+            # Accept either numeric or string representations of floats
+            version = float(version)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid version. Version must be a floating point number"}), 400
 
-        # create client record
-        current_time = datetime.utcnow().isoformat() + 'Z'
-        client_record = {
-            "client_id": client_id,
-            "hostname": data["hostname"],
-            "platform": data["platform"],
-            "ip_address": ip_address,
-            "version": data.get("version", "unknown"),
-            "status": "online", # default status for new client
-            "registered_at": current_time, # registration timestamp
-            "last_seen": current_time # initialize last_seen to registration time
-        }
+        current_time = dt.datetime.now(dt.timezone.utc)
 
-        # Store in mock database
-        MOCK_CLIENTS[client_id] = client_record
+        # Persist client record (client_secret stored with client data)
+        database.register_client(client_id, data["hostname"], data["platform"], secret_key)
 
         # Return success response
         # This is the only time we return the secret key
@@ -184,214 +176,3 @@ def register_client():
     except Exception as e:
         # catch-all for unexpected errors
         return jsonify({"error": f"Registration failed: {str(e)}"}), 500
-    
-# ================ Heartbeat Endpoint ==================
-
-@client_bp.route('/<client_id>/heartbeat', methods=['POST'])
-def client_heartbeat(client_id: str):
-    """
-    Client sends periodic hearbeat to show its still alive.
-    
-    Endpoint: POST /api/clients/<client_id>/heartbeat
-
-    If the server doesnt receive a heartbeat within a timeframe it marks the client as offline.
-
-    Request Body: (optional JSON)
-    {
-        "status": "online" # or "warning", "error"
-        "message": "Optional status message"    
-    }
-
-    Response Success: (JSON) 
-    {
-        "status": "acknowledged",
-        "ack_id": "<acknowledgement_id>",
-        "server_time": "<timestamp>",
-        "next_heartbeat": "<seconds>"
-    }
-    """
-
-    # validate request
-    valid, error_response, status_code = validate_client_request(client_id)
-    if not valid:
-        return jsonify(error_response), status_code
-    
-    try:
-        # Get optional body data
-        data = request.get_json() or {}
-
-        # update clients last seen timestamp
-        current_time = datetime.utcnow().isoformat() + 'Z'
-        MOCK_CLIENTS[client_id]['last_seen'] = current_time
-
-        # update status if provided
-        if 'status' in data:
-            valid_statuses = ['online', 'warning', 'error', 'offline']
-            if data['status'] in valid_statuses:
-                MOCK_CLIENTS[client_id]['status'] = data['status']
-
-        # generate acknowledgement id
-        ack_id = generate_ack_id()
-
-        #return success response
-        return jsonify({
-            "status": "acknowledged",
-            "ack_id": ack_id,
-            "server_time": current_time,
-            "next_heartbeat": 300 # seconds until next heartbeat
-        }), 200
-    
-    except Exception as e:
-        return jsonify({"error": f"Heartbeat failed: {str(e)}"}), 500
-    
-# ================ Client Info Endpoint ==================
-
-@client_bp.route('/<client_id>', methods=['GET'])
-def get_client_info(client_id: str):
-    """
-    Retrieve detailed information about a client.
-
-    Endpoint: GET /api/clients/<client_id>
-
-    Resposnse Success (JSON):
-    {
-        "client_id": "<uuid>",
-        "hostname": "server-01",
-        "platform": "linux",
-        "ip_address": "<ip_address>",
-        "version": "0.03",
-        "status": "online",
-        "registered_at": "<timestamp>",
-        "last_seen": "<timestamp>"    
-    }
-    """
-
-    # validate request
-    valid, error_response, status_code = validate_client_request(client_id)
-    if not valid:
-        return jsonify(error_response), status_code
-    
-    try:
-        # Get client data from mock database
-        client_data = MOCK_CLIENTS[client_id]
-
-        return jsonify(client_data), 200
-
-    except Exception as e:
-        return jsonify({"error": f"Failed to retrieve client info: {str(e)}"}), 500
-    
-
-# ================ UPDATE CLIENT STATUS ENDPOINT ==================
-
-@client_bp.route('/<client_id>/status', methods=['PUT'])
-def update_client_status(client_id: str):
-    """
-    Update client status and metadata.
-
-    Endpoint: PUT /api/clients/<client_id>/status
-
-    Request Body (JSON):
-    {
-        "hostname": "<hostname>", # optional
-        "ip_address": "<ip_address>", # optional
-        "version": "<version>", # optional
-        "status": "<status>" # optional
-    }
-
-    Response Success (JSON):
-    {
-        "message": "Client status updated successfully",
-        "updated_feilds": ["<field1>", "<field2>", ...]
-        "updated_at": "<timestamp>"
-    }
-    """
-
-    # validate request
-    valid, error_response, status_code = validate_client_request(client_id)
-    if not valid:
-        return jsonify(error_response), status_code
-    
-    try:
-        # Parse request JSON
-        data = request.get_json()
-
-        if not data:
-            return jsonify({"error": "No update data provided"}), 400
-        
-        # track which fields were updated
-        updated_fields = []
-
-        # Update allowed fields
-        allowed_fields = ["hostname", "ip_address", "version", "status"]
-        for field in allowed_fields:
-            if field in data:
-                MOCK_CLIENTS[client_id][field] = data[field]
-                updated_fields.append(field)
-        
-        # update last_seen timestamp
-        current_time = datetime.utcnow().isoformat() + 'Z'
-        MOCK_CLIENTS[client_id]['last_seen'] = current_time
-
-        # Return success response
-        return jsonify({
-            "message": "Client status updated successfully",
-            "updated_fields": updated_fields,
-            "updated_at": current_time
-        }), 200
-    
-    except Exception as e:
-        return jsonify({"error": f"Update failed: {str(e)}"}), 500
-# Note: In a production system, proper logging, error handling, and database interactions would be implemented.
-
-# =============== List All Clients Endpoint (ADMIN ONLY) ==================
-
-@client_bp.route('/', methods=['GET'])
-def list_all_clients():
-    """
-    List all registered clients
-    
-    Endpoint: GET /api/clients
-
-    # Note: This endpoint should be protected and accessible only to admin users.
-    # for testing it is left open.
-
-    Query Parameters:
-        ?status=<status> : Filter clients by status (online, offline, warning, error)
-        ?platform=<platform> : Filter clients by platform (linux, windows, macos)
-    
-    Response Success (JSON):
-    {
-        "clients": [
-            {"client_data_1"}
-            {"client_data_2"}
-            ...
-        ],
-        "total_clients": <number>,
-        "filtered_clients": <number>
-    }
-    """
-
-    try:
-        # Get filter params
-        status_filter = request.args.get('status')
-        platform_filter = request.args.get('platform')
-
-        # Start with all clients
-        clients = list(MOCK_CLIENTS.values())
-
-        # Apply status filter if provided
-        if status_filter:
-            clients = [c for c in clients if c['status'] == status_filter]
-        
-        if platform_filter:
-            clients = [c for c in clients if c['platform'] == platform_filter]
-
-        # Return client list
-        return jsonify({
-            "clients": clients,
-            "total": len(MOCK_CLIENTS),
-            "filtered": len(clients)
-        }), 200
-
-    except Exception as e:
-        return jsonify({"error": f"Failed to list clients: {str(e)}"}), 500

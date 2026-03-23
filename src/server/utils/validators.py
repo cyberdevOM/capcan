@@ -25,12 +25,10 @@ Timestamp Validation:
     Requests must be recent (within x seconds). preventing replaying old requests.
 """
 
-import hmac
-import hashlib
-import time
-import uuid
+import hmac, hashlib, time, uuid
+import datetime as dt
 from typing import Tuple, Optional
-from datetime import datetime, timedelta
+from src.server.core.database import Database
 
 MAX_TIMESTAMP_AGE = 300 # 5 minutes
 VALID_ALGORITHMS = ['sha256'] # Supported HMAC algorithms
@@ -129,7 +127,6 @@ def validate_signature(
     except Exception as e:
         return False, f"Error validating signature: {str(e)}"
     
-
 def generate_ack_id() -> str:
     """
     Generate a unique ack ID for tracking requests.
@@ -172,46 +169,3 @@ def extract_security_headers(headers: dict) -> Tuple[Optional[str], Optional[str
     if not all([client_id, timestamp, signature]):
         return None, None, None
     return client_id, timestamp, signature
-
-
-# Mock storage for demonstration purposes
-# In prod, this will be a database query
-
-MOCK_CLIENT_SECRETS = {
-    # When a client registers, we generate a shared secret key
-    # Both client and server store this securely
-    # format: {client_id: secret_key}
-}
-
-def get_client_secret(client_id: str) -> Optional[str]:
-    """
-    Retrieves the shared secret key for a client.
-
-    Note: 
-        In production, this would query the database. For demo, we use a mock dictionary.
-
-    Args: 
-        client_id (str): The UUID of the client.
-
-    Returns:
-        Secret key string or None if client not found.
-    """
-    return MOCK_CLIENT_SECRETS.get(client_id)
-
-def register_client_secret(client_id: str, secret_key: str) -> None:
-    """
-    Stores a client's shared secret (mock implementation).
-    
-    when a client first registers:
-    1. Server generates a random secret key
-    2. Server stores it in database
-    3. Server shares it to the client (only ever once) over https
-    4. Client stores it securely in config
-    5. All future requests use this secret for signing
-
-    Args:
-        client_id (str): UUID of the new client.
-        secret_key (str): Randomly generated secret key.
-    """
-    MOCK_CLIENT_SECRETS[client_id] = secret_key
-

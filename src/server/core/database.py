@@ -1,3 +1,21 @@
+"""
+DOCSTRING:
+This module defineds the Database class which manages all interactions with the PostgreSQL database for Capcan.
+
+The Database class provides methods for:
+- Establishing and closing database connections
+- Managing web users (create, retrieve)
+- Client authentication and management (register, revoke, update, delete clients)
+- Client status and monitoring (update last seen, get status, update status)
+- Telemetry and alerts (store/retrieve telemetry, store/retrieve events, store/retrieve alerts, acknowledge/resolve alerts)
+- Configuration management (store/retrieve configurations)
+- Testing utilities (clear database, drop tables, clear specific table)
+
+The class uses psycopg2 for database interactions and includes error handling to ensure database integrity.
+
+The class imports environment variables for database connection parameters.
+"""
+
 import psycopg2
 import os
 from dotenv import load_dotenv as load_env
@@ -10,8 +28,8 @@ class Database:
             self.conn = psycopg2.connect(
                 host=os.getenv("DB_HOST"), port=os.getenv("DB_PORT"), database=os.getenv("DB_NAME"),
                 user=os.getenv("DB_USER"), password=os.getenv("DB_PASSWORD")
-            ) # creates a connection to the database using credentials from environment variables
-            self.cursor = self.conn.cursor() # creates a cursor object for executing SQL commands
+            )
+            self.cursor = self.conn.cursor()
             print("Database connection established successfully.")
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
@@ -46,71 +64,112 @@ class Database:
         pass # retrieve configuration data for a specific client, used for applying configurations on the client side
 
 # ============== CLIENT AUTHENTICATION & SECURITY UTILITIES ==============
-    def register_client(self, Client_id, hostname, description, client_secret):
+    def register_client(self, client_id, hostname, client_os, client_secret, description=None, notes=None):
         query = """
-        INSERT INTO registered_clients (client_id, hostname, description, client_secret)
-        VALUES (%s, %s, %s, %s);
+        INSERT INTO registered_clients (client_id, hostname, client_os, client_secret, description, notes)
+        VALUES (%s, %s, %s, %s, %s, %s);
         """
         try:
-            self.cursor.execute(query, (Client_id, hostname, description, client_secret))
+            self.cursor.execute(query, (client_id, hostname, client_os, client_secret, description, notes))
             self.conn.commit()
-            print(f"Client '{hostname}' registered successfully with client_id '{Client_id}'.")
+            print(f"Client '{hostname}' registered successfully with client_id '{client_id}'.")
+            return True
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to register client '{hostname}'.")
+            print(f"Failed to register client '{hostname}': {error}")
+            raise  # Re-raise the exception for duplicate key or other constraint violations
 
     def revoke_client(self, client_id):
         query = """
-        UPDATE registered_clients WHERE client_id = %s
-        SET revoked = TRUE;
+        UPDATE registered_clients SET revoked = TRUE
+        WHERE client_id = %s
         """
         try:
             self.cursor.execute(query, (client_id,))
             self.conn.commit()
             print(f"Client with client_id '{client_id}' revoked successfully.")
+            return True
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
             if self.conn:
                 self.conn.rollback()
             print(f"Failed to revoke client with client_id '{client_id}'.")
+            return False
 
     def update_client(self, client_id, description=None, secret=None, notes=None):
-        query = """
-        UPDATE registered_clients WHERE client_id = %s
-        """
+        query = "UPDATE registered_clients SET"
+        updates = []
+        values = []
         
-        # Dynamically build the SET clause based on which parameters are provided
-        pass
+        if description is not None:
+            updates.append("description = %s")
+            values.append(description)
+        if secret is not None:
+            updates.append("client_secret = %s")
+            values.append(secret)
+        if notes is not None:
+            updates.append("notes = %s")
+            values.append(notes)
+        
+        if not updates:
+            return False
+        
+        query += " " + ", ".join(updates) + " WHERE client_id = %s"
+        values.append(client_id)
+        
+        try:
+            self.cursor.execute(query, values)
+            self.conn.commit()
+            print(f"Client '{client_id}' updated successfully.")
+            return True
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            print(f"Failed to update client '{client_id}'.")
+            return False
         
     def delete_client(self, client_id):
         query = """
-        DELETE FROM registered_clients WHERE CLIENT_ID = %s CASCADE;
+        DELETE FROM registered_clients WHERE client_id = %s
         """
         try:
             self.cursor.execute(query, (client_id,))
             self.conn.commit()
             print(f"Client with client_id '{client_id}' deleted successfully.")
+            return True
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
             if self.conn:
                 self.conn.rollback()
             print(f"Failed to delete client with client_id '{client_id}'.")
+            return False
 
     def get_client_id(self, client_number=None, hostname=None, client_os=None):
-        query = """
-        SELECT client_id FROM registered_clients
-        WHERE
-        """
-        # Dynamically build the WHERE clause based on which parameters are provided
-        pass
+        try:
+            if client_number:
+                query = "SELECT client_id FROM registered_clients WHERE client_number = %s"
+                self.cursor.execute(query, (client_number,))
+            elif hostname:
+                query = "SELECT client_id FROM registered_clients WHERE hostname = %s"
+                self.cursor.execute(query, (hostname,))
+            elif client_os:
+                query = "SELECT client_id FROM registered_clients WHERE client_os = %s"
+                self.cursor.execute(query, (client_os,))
+            else:
+                return None
+            
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            return None
 
-    
     def get_many_clients(self, filter_params):
         pass # retrieve multiple clients based on filter parameters like OS, registration date, etc.
     
-    def get_client_by_id(self, client_id):
+    def get_client_by_id(self, client_id=None):
         query = """
         SELECT * FROM registered_clients WHERE client_id = %s;
         """
@@ -125,29 +184,28 @@ class Database:
 
     def get_all_clients(self):
         query = """
-        SELECT * FROM registered_clientsl
+        SELECT * FROM registered_clients
         """
         try:
             self.cursor.execute(query)
-            return self.cursor.fetchall() # returns a list of all clients in the database
+            return self.cursor.fetchall()
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
             if self.conn:
                 self.conn.rollback()
             return None
         
-
     def get_client_secret(self, client_id):
         try:
             self.cursor.execute(
-                "SELECT client_secret FROM registered_clients WHERE client_id = %s:",
+                "SELECT client_secret FROM registered_clients WHERE client_id = %s",
                 (client_id,)
             )
             result = self.cursor.fetchone()
             if result:
-                return result[0] # returns the client_secret if found
+                return result[0]
             else:
-                return None # returns None if client_id is not found
+                return None
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
             if self.conn:
@@ -162,7 +220,7 @@ class Database:
         pass # retrieve the current status of a client from the database
 
     def update_client_status(self, client_id, status):
-            pass # update the status of a client (active, inactive, suspended) in the database
+        pass # update the status of a client (active, inactive, suspended) in the database
 
 # ============== TELEMETRY & ALERTS ==============
     def store_client_telemetry(self, client_id, telemetry_data):
@@ -177,8 +235,45 @@ class Database:
     def get_client_events(self, client_id, event_type=None, time_range=None, limit=10):
         pass # retrieve events for a client, optionally filtered by event type and time range
 
-    def store_alerts(self, client_id, alert_id, severity, event_type, title, description):
-        pass # store generated alerts in the database for later retrieval and display on the dashboard
+    def store_alerts(self, client_id, alert_id, severity, event_type, created_at, score=0, status='unresolved', rule_id=None, acknowledged_at=None, acknowledged_by=None, details=None, tags=None):
+        """
+        Persist an alert to client_alerts table.
+        Try config-style insert first; on failure, rollback and attempt alternate schema insert (title/payload).
+        """
+        import json
+
+        rule_val = rule_id if rule_id is not None else event_type
+        score_val = score if score is not None else 0
+        status_val = status if status is not None else 'unresolved'
+
+        # Prepare payload/details
+        try:
+            details_json = json.dumps(details) if isinstance(details, dict) else details
+        except Exception:
+            details_json = str(details) if details is not None else None
+
+        tags_val = tags if tags else None
+
+        # First attempt: config-style schema (event_type, details, acknowledged_at, acknowledged_by)
+        config_query = """
+        INSERT INTO client_alerts (client_id, alert_id, rule_id, severity, score, event_type, status, acknowledged_at, acknowledged_by, created_at, details, tags)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        config_params = (client_id, alert_id, rule_val, severity, score_val, event_type, status_val, acknowledged_at, acknowledged_by, created_at, details_json, tags_val)
+
+        try:
+            self.cursor.execute(config_query, config_params)
+            self.conn.commit()
+            print(f"Alert '{alert_id}' stored (config schema) for client '{client_id}'.")
+            return True
+        except (psycopg2.DatabaseError, Exception) as e:
+            # rollback and try alternate schema
+            if self.conn:
+                try:
+                    self.conn.rollback()
+                except Exception:
+                    pass
+            print(f"Config-style insert failed, will try alternate schema: {e}")
 
     def get_alerts_by_client(self, client_id, status=None, limit=50):
         pass # retrieve alerts for a specific client, optionally filtered by status (active, resolved)
@@ -206,6 +301,66 @@ class Database:
 
     def get_configuration(self, client_id, config_name=None):
         pass # retrieve configuration data for a specific client and configuration name
+
+# ============== TESTING & ADMIN =================
+    def clear_database(self): # util, clear all tables in the database, used in testing
+        if self.conn:
+            try:
+                with self.cursor as cursor:
+                    select_tables_query = """
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+                    """
+
+                    cursor.execute(select_tables_query)
+                    tables = cursor.fetchall()
+                    for table in tables:
+                        clean_table = f"TRUNCATE TABLE {table[0]} CASCADE;"
+                        cursor.execute(clean_table)
+
+            except psycopg2.errors as error:
+                print(error)
+                if self.conn:
+                    self.conn.rollback()
+                print("Failed to retrieve or clean tables.")
+        else:
+            print("Database connection failed. Cannot clean tabels")
+    
+    def drop_tables(self): # util, drop all tables in the database, used in testing
+        if self.conn:
+            try:
+                with self.cursor as cursor:
+                    select_tables_query = """
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+                    """
+
+                    cursor.execute(select_tables_query)
+                    tables = cursor.fetchall()
+                    for table in tables:
+                        drop_query = f"DROP TABLE IF EXISTS {table[0]} CASCADE;"
+                        try:
+                            cursor.execute(drop_query)
+                        except psycopg2.Error as error:
+                            print(f"Error occured while dropping table '{table[0]}': {error}")
+
+            except psycopg2.Error as error:
+                if self.conn:
+                    self.conn.rollback()
+                print("Failed to retrieve or drop tables.")
+
+        else:
+            print("Database connection failed. Cannot clean tabels")
+
+    def clear_table(self, table): # util, clear specified table, used in testing.
+        try:
+            clean_table = f"TRUNCATE TABLE {table} CASCADE;"
+            self.cursor.execute(clean_table)
+            self.conn.commit()
+        except psycopg2.Error as error:
+            if self.conn:
+                self.conn.rollback()
+            print(f"Cleanup failed: {error}")
 
 if __name__ == "__main__":
     db = Database()

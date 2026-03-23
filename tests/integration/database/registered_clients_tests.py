@@ -5,7 +5,7 @@ from src.server.core.database import Database
 
 # ============== FIXTURES ==============
 @pytest.fixture(scope="function")
-def db():
+def database():
     """Create a database connection for each test"""
     database = Database()
     yield database
@@ -19,10 +19,12 @@ def test_client_id():
 
 @pytest.fixture(scope="function")
 def test_client_data(test_client_id):
-    """Standard test client data"""
+    """Standard test client data with unique hostname"""
+    # Make hostname unique to avoid collisions when querying by hostname
+    unique_hostname = f"test-client-{test_client_id[:8]}"
     return {
         "client_id": test_client_id,
-        "hostname": "test-client-01",
+        "hostname": unique_hostname,
         "client_os": "linux",
         "client_secret": "test-secret-key-123",
         "description": "Test client for unit testing",
@@ -84,15 +86,16 @@ class TestClientRetrieval:
         assert res is not None
         assert len(res) > 0 # should return at least the registered test client
     
-    @pytest.mark.parameterize("search_param,search_value", [
+    @pytest.mark.parametrize("search_param,search_value", [
         ("client_number", 1), 
-        ("hostname", "test-client-01"),
+        ("hostname", None),  # Will use the unique hostname from test_client_data
         ("client_os", "linux")
     ])
     def test_get_client_id(self, database, registered_test_client, test_client_data, search_param, search_value):
         """Test retrieving client_id based on different search parameters."""
         if search_param == "hostname":
-            res = database.get_client_id(hostname=search_value)
+            # Use the dynamic hostname from test_client_data
+            res = database.get_client_id(hostname=test_client_data["hostname"])
             assert res == test_client_data["client_id"]
 
 # ============== Client Secret Tests ==============
@@ -215,4 +218,4 @@ class TestClientIntegration:
 
         # cleanup
         for client in clients:
-            db.delete_client(client["client_id"])
+            database.delete_client(client["client_id"])

@@ -10,7 +10,7 @@ notes TEXT DEFAULT NULL
 
 import uuid
 import random
-from src.server.core.dbconn import connect, close
+from src.server.core.database import Database 
 
 
 def gen_clients(n=1000):
@@ -28,10 +28,10 @@ def gen_clients(n=1000):
 
 def fill_clients():
     # Generate and insert a batch of clients into registered_clients table.
-    conn = connect()
+    database = Database()
     clients = gen_clients() # default to 1000 clients, adjust as needed for testing
     try:
-        with conn.cursor() as cursor:
+        with database.cursor() as cursor:
             for c in clients:
                 cursor.execute(
                     """
@@ -42,12 +42,12 @@ def fill_clients():
                     """,
                     (c["client_id"], c["hostname"], c["description"], c["notes"]),
                 )
-        conn.commit()
+        database.conn.commit()
         print(f"Inserted {len(clients)} clients.")
     except Exception as error:
         print(error)
     finally:
-        close(conn)
+        Database.close(database.conn)
 
 if __name__ == "__main__":
     # when run directly, populate the table

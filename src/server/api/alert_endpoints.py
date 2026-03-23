@@ -2,7 +2,7 @@
 
 from email import utils
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+import datetime as dt
 from typing import Dict, Any, List
 import uuid
 
@@ -11,35 +11,12 @@ from ..utils.validators import (
     validate_signature,
     extract_security_headers,
     generate_ack_id,
-    get_client_secret
 )
+
+from ..core.database import Database
 
 # Create Flask Blueprint for alert endpoints
 alert_bp = Blueprint('alerts', __name__, url_prefix='/api/alerts')
-
-# ========== MOCK DATA STORAGE ==========
-# In production, replace with database interactions.
-
-MOCK_ALERTS = {
-    # Format: {"alert_id": {alert_data}}
-    # Example:
-    # "alert-123": {
-    #     "alert_id": "alert-123",
-    #     "client_id": "550e8400-e29b-41d4-a716-446655440000",
-    #     "severity": "critical",
-    #     "event_type": "file_modified",
-    #     "timestamp": "2024-12-09T10:30:00Z",
-    #     "acknowledged": False,
-    #     "details": {
-    #         "file_path": "/var/honeyfiles/trap.txt",
-    #         "process_name": "suspicious.exe",
-    #         "process_id": 1234
-    #     }
-    # }
-}
-
-# Track registered clients (client query table)
-MOCK_REGISTERED_CLIENTS = set()
 
 # ========== CONFIGURATION ==========
 
@@ -77,6 +54,8 @@ def validate_alert_request(client_id: str) -> tuple[bool, Dict[str, Any], int]:
     returns: Tuple of (success, response_dict, status_code)
     """
     
+    database = Database() # Initialize database connection
+
     # Extract security headers
     headers_client_id, timestamp, signature = extract_security_headers(request.headers)
 
@@ -87,19 +66,21 @@ def validate_alert_request(client_id: str) -> tuple[bool, Dict[str, Any], int]:
         }, 401
     
     # Validate timestamp
-    valid_time, time_error = validate_timestamp(timestamp) ##! IMPLIMENT IN VALIDATORS !
+    valid_time, time_error = validate_timestamp(timestamp)
     if not valid_time:
         return False, {"error": f"Invalid timestamp: {time_error}"}, 401
     
     # Validate client ID matches
-    if headers_client_id not in MOCK_REGISTERED_CLIENTS:
+    
+
+    if database.get_client_by_id(headers_client_id) is None:
         return False, {
             "error": "Client not registered.",
             "hint": "Register at POST /api/clients/register first."
         }, 404
     
     # Get client secret
-    secret_key = get_client_secret(headers_client_id)
+    secret_key = database.get_client_secret(headers_client_id)
     if not secret_key:
         return False, {"error": "Client secret not found."}, 401
     
@@ -163,7 +144,7 @@ def validate_alert_data(data: Dict[str, Any]) -> tuple[bool, str]:
     if 'timestamp' in data:
         try:
             # Try to parse the timestamp
-            datetime.strptime(data['timestamp'].rstrip('Z'))
+            dt.datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
         except (ValueError, AttributeError):
             return False, "Invalid timestamp format. Use ISO 8601 format."
     
@@ -218,6 +199,7 @@ def submit_alert():
 
     # Extract client ID from headers
     headers_client_id, _, _ = extract_security_headers(request.headers)
+    database = Database() # Initialize database connection
 
     if not headers_client_id:
         return jsonify({"error": "Missing X-Client-ID header."}), 401
@@ -241,26 +223,30 @@ def submit_alert():
         
         # Generate alert metadata
         alert_id = generate_alert_id()
-        current_time = datetime.utcnow().isoformat() + 'Z'
+        # use timezone-aware datetime for DB insertion
+        current_time = dt.datetime.now(dt.timezone.utc)
 
-        # client timestamp if  provided, else use server time
-        alert_timestamp  = data.get('timestamp', current_time)
+        # client timestamp if provided, else use server time
+        alert_timestamp = data.get('timestamp', current_time)
 
         # create alert record
-        alert_record = {
-            "alert_id": alert_id,
-            "client_id": headers_client_id,
-            "severity": data['severity'],
-            "event_type": data['event_type'],
-            "timestamp": alert_timestamp,
-            "acknowledged": False,
-            "acknowledged_at": None,
-            "acknowledged_by": None,
-            "details": data['details']
-        }
+        #* Note: Please see database config in /core/config.py for the alert schema. 
 
-        # Store alert in MOCK storage
-        MOCK_ALERTS[alert_id] = alert_record
+        database.store_alerts(
+            client_id=headers_client_id,
+            alert_id=alert_id,
+            rule_id=data['event_type'],
+            severity=data['severity'],
+            score=0,
+            event_type=data['event_type'],
+            status='unresolved',
+            created_at=alert_timestamp,
+            acknowledged_at=None,
+            acknowledged_by=None,
+            details=data['details'],
+            tags=None
+        )
+
 
         # Generate ack ID
         ack_id = generate_ack_id()
@@ -268,15 +254,14 @@ def submit_alert():
             "status": "received",
             "alert_id": alert_id,
             "ack_id": ack_id,
-            "received_at": current_time,
+            "received_at": current_time.isoformat().replace('+00:00', 'Z') if hasattr(current_time, 'isoformat') else str(current_time),
             "severity": data['severity']
         }), 201
     
     except Exception as e:
         return jsonify({"error": f"Error processing alert: {str(e)}"}), 500
     
-# ========== SUBMIT BULK ALERTS ENDPOINT ==========
-
+# ========== SUBMIT BULK ALERTS ENDPOINT ========== #TODO: Change endpoint to integrate with database
 @alert_bp.route('/bulk', methods=['POST'])
 def submit_bulk_alerts():
     """
@@ -340,7 +325,7 @@ def submit_bulk_alerts():
         
         # Process each alert
 
-        current_time = datetime.utcnow().isoformat() + 'Z'
+        current_time = dt.datetime.now(dt.timezone.utc).isoformat() + 'Z'
         processed_alerts = []
         failed_alerts = []
 
@@ -389,7 +374,7 @@ def submit_bulk_alerts():
     except Exception as e:
         return jsonify({"error": f"Error processing bulk alerts: {str(e)}"}), 500
     
-# =========== Acknowledge alert endpoint ==========
+# =========== Acknowledge alert endpoint ========== #TODO: Change endpoint to integrate with database
 @alert_bp.route('/acknowledge/<alert_id>', methods=['POST'])
 def acknowledge_alert(alert_id):
     """
@@ -425,7 +410,7 @@ def acknowledge_alert(alert_id):
         data = request.get_json() or {}
 
         # update alert status
-        current_time = datetime.utcnow().isoformat() + 'Z'
+        current_time = dt.datetime.now(dt.timezone.utc).isoformat() + 'Z'
         MOCK_ALERTS[alert_id]['acknowledged'] = True
         MOCK_ALERTS[alert_id]['acknowledged_at'] = current_time
         MOCK_ALERTS[alert_id]['acknowledged_by'] = data.get('acknowledged_by', 'unknown')
