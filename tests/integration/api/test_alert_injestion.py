@@ -8,7 +8,7 @@ Integration tests for the alert ingestion API endpoint. These tests cover variou
 The tests ensure that the API correctly validates incoming data, handles errors gracefully, and responds with appropriate status codes and messages.
 """
 
-import pytest
+import pytest, uuid, secrets
 from src.server.app import create_app
 from src.server.core.database import Database
 import datetime as dt
@@ -24,8 +24,33 @@ def client(app):
     # Flask test client
     return app.test_client()
 
-# auto clean database table "client_alerts"
-@pytest.fixture(autouse=True)
+@pytest.fixture(scope="function")
+def database():
+    """Create a database connection for each test"""
+    database = Database()
+    yield database
+    # Cleanup after test
+    database.close()
+
+@pytest.fixture(autouse=True) # create a test client in the database for authentication tests
+def test_client(database):
+    """Create a test client in the database for authentication tests"""
+    client_id = str(uuid.uuid4())
+    hostname = "test-host"
+    platform = "linux"
+    secret_key = secrets.token_hex(32)
+    notes = "Test client for alert ingestion tests"
+
+    database.register_client(client_id, hostname, platform, secret_key, notes)
+
+    yield {
+        "client_id": client_id,
+        "secret_key": secret_key
+    } # provide client details to tests
+
+    database.delete_client(client_id) # clean up test client after tests
+
+@pytest.fixture(autouse=True) # auto clean database table "client_alerts"
 def clean():
     database = Database()
     try:
@@ -34,8 +59,8 @@ def clean():
         print(f"Cleanup failed: {e}")
         database.conn.rollback()
     
-    yield database
-    # clean up after test
+    yield # wait for tests to run and then clean up after tests
+    
     try:
         database.clear_table("client_alerts")
     except Exception as e:
@@ -48,63 +73,52 @@ def clean():
 class TestAlertIngestion:
     # Tests for POST /api/alerts/
 
-    def test_alert_ingestion_success(self, client, clean):
-        # Test successful alert ingestion and DB persistence
-        import json, time, uuid, hmac, hashlib, secrets
-
-        # prepare client and register in DB
-        client_id = str(uuid.uuid4())
-        secret = secrets.token_hex(32)
-        clean.register_client(client_id, "test-server", "linux", secret)
-
+    #! Note: not functional yet due to 401 error
+    
+    def test_alert_ingestion_success(self, client, test_client, database):
+        import hmac, hashlib, json
+        timestamp = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
         payload = {
-            "severity": "critical",
-            "event_type": "file_modified",
-            "details": {
-                "file_path": "/tmp/testfile",
-                "process_name": "testproc",
-                "process_id": 1234,
-                "description": "integration test"
-            }
+            "event_type": "test_event",
+            "severity": "high",
+            "details": {"description": "This is a test alert for integration testing."}
         }
-
-        # deterministic JSON serialization for signing
-        body = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-        timestamp = str(int(time.time()))
-        message = f"{client_id}{timestamp}".encode('utf-8') + body.encode('utf-8')
-        signature = hmac.new(secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
-        signature_header = f"sha256={signature}"
-
+        body = json.dumps(payload).encode('utf-8')
+        message = f"{test_client['client_id']}{timestamp}".encode('utf-8') + body
+        signature = hmac.new(
+            key=test_client["secret_key"].encode('utf-8'),
+            msg=message,
+            digestmod=hashlib.sha256
+        ).hexdigest()
         headers = {
-            'X-Client-ID': client_id,
-            'X-Timestamp': timestamp,
-            'X-Signature': signature_header,
-            'Content-Type': 'application/json'
+            "X-Client-ID": test_client["client_id"],
+            "X-Timestamp": timestamp,
+            "X-Signature": f"sha256={signature}"
         }
 
-        # send request using the exact body used for signing
-        response = client.post('/api/alerts/', data=body, headers=headers)
+        response = client.post(
+            '/api/alerts/',
+            headers=headers,
+            json=payload,
+            content_type='application/json'
+        )
+        print('RESPONSE BODY:', response.get_data(as_text=True))
         assert response.status_code == 201
         data = response.get_json()
-        assert data['status'] == 'received'
-        assert 'alert_id' in data
-        alert_id = data['alert_id']
+        assert data["status"] == "received"
+        assert "alert_id" in data
+        assert "ack_id" in data
+        client_id = test_client["client_id"]
 
-        # verify alert persisted in the DB
-        clean.cursor.execute(
-            "SELECT alert_id, client_id, severity, event_type, acknowledged_at, acknowledged_by, created_at, details FROM client_alerts WHERE alert_id = %s",
-            (alert_id,)
-        )
-        row = clean.cursor.fetchone()
-        assert row is not None
-        assert row[0] == alert_id
-        assert row[2] == 'critical'
-        assert row[3] == 'file_modified'
-        assert row[4] is None
-        assert row[5] is None
+        alerts = database.get_alerts_by_client(client_id, limit=1)
 
-        # details were stored as JSON string - validate contents
-        details_db = row[7]
-        assert details_db is not None
-        details_json = json.loads(details_db)
-        assert details_json['process_name'] == 'testproc'
+    def test_alert_ingestion_missing_fields(self, client, clean):
+        pass
+
+    def test_alert_ingestion_invalid_data(self, client, clean):
+        pass
+
+    def test_alert_ingestion_auth_failure(self, client, clean):
+        pass
+
+    

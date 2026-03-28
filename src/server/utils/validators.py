@@ -35,30 +35,26 @@ VALID_ALGORITHMS = ['sha256'] # Supported HMAC algorithms
 
 def validate_timestamp(timestamp: str, max_age: int = MAX_TIMESTAMP_AGE) -> Tuple[bool, str]:
     """
-    Validate the provided timestamp to ensure it's within the allowed age.
+    Validate the provided timestamp (ISO8601 with 'Z') to ensure it's within the allowed age.
 
     Args:
-        timestamp (str): The timestamp string to validate.
+        timestamp (str): The timestamp string to validate (ISO8601 with 'Z').
         max_age (int): Maximum allowed age in seconds.
 
     Returns:
         Tuple[bool, str]: A tuple containing a boolean indicating validity and an error message if invalid.
     """
+    from src.server.utils.timestamper import parse_timestamp
     try:
-        # convert timestamp to integer
-        request_time = int(timestamp)
-    except (ValueError, TypeError):
-        # Invalid timestamp format
-        return False, "Invalid timestamp format - must be Unix timestamp."
-    
-    current_time = int(time.time()) # current Unix timestamp
-    age = current_time - request_time # calculate age of the timestamp
-    if age < -60: # Allow small clock skew
+        request_time = parse_timestamp(timestamp)
+    except Exception:
+        return False, "Invalid timestamp format - must be ISO8601 with 'Z' suffix."
+    current_time = dt.datetime.now(dt.timezone.utc)
+    age = (current_time - request_time).total_seconds()
+    if age < -60:
         return False, "Timestamp is from the future."
-    
     if age > max_age:
         return False, "Timestamp is too old."
-    
     return True, ""
 
 def validate_signature(

@@ -19,6 +19,14 @@ def client(app):
     # Flask test client
     return app.test_client()
 
+@pytest.fixture(scope="function")
+def database():
+    """Create a database connection for each test"""
+    database = Database()
+    yield database
+    # Cleanup after test
+    database.close()
+
 # auto clean database table "registered _clients" before and after a test to ensure data validity
 @pytest.fixture(autouse=True)
 def clean():
@@ -29,7 +37,7 @@ def clean():
         print(f"Cleanup failed: {e}")
         database.conn.rollback()
  
-    yield database
+    yield
     # clean up after test
     try:
         database.clear_table("registered_clients")
@@ -43,7 +51,7 @@ def clean():
 class TestClientRegistration:
     # Tests for POST /api/clients/register endpoint
     
-    def test_register_client_success(self, client):
+    def test_register_client_success(self, client, database):
         # Test successful client registration
         payload = {
             "hostname": "test-server-01",
@@ -55,11 +63,15 @@ class TestClientRegistration:
             content_type='application/json'
         )
         
-        assert response.status_code == 201 #! Error returned 200 not 201
+        assert response.status_code == 201
         data = response.get_json()
         assert "client_id" in data
         assert "secret_key" in data
         assert data["message"] == "Client registered successfully"
+        client_id = data["client_id"]
+        db_row = database.get_client_by_id(client_id)
+        assert db_row is not None
+        print (f"Registered client in DB: {db_row}")
     
     def test_register_client_missing_hostname(self, client):
         # Test registration fails without hostname

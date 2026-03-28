@@ -37,9 +37,11 @@ VALID_EVENT_TYPES = [
     'custom'
 ]
 
+database = Database() # Initialize database connection
+
 # ========== HELPER FUNCTIONS ==========
 
-def validate_alert_request(client_id: str) -> tuple[bool, Dict[str, Any], int]:
+def validate_alert_request() -> tuple[bool, Dict[str, Any], int]:
     """
     Validate alert submission request with HMAC authentication.
 
@@ -53,8 +55,6 @@ def validate_alert_request(client_id: str) -> tuple[bool, Dict[str, Any], int]:
 
     returns: Tuple of (success, response_dict, status_code)
     """
-    
-    database = Database() # Initialize database connection
 
     # Extract security headers
     headers_client_id, timestamp, signature = extract_security_headers(request.headers)
@@ -143,8 +143,9 @@ def validate_alert_data(data: Dict[str, Any]) -> tuple[bool, str]:
     # Validate timestamp if provided
     if 'timestamp' in data:
         try:
-            # Try to parse the timestamp
-            dt.datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
+            # Parse and convert to ISO 8601 with 'Z'
+            parsed_time = dt.datetime.strptime(data['timestamp'], "%Y-%m-%dT%H:%M:%SZ")
+            data['timestamp'] = parsed_time.replace(tzinfo=dt.timezone.utc).isoformat().replace('+00:00', 'Z')
         except (ValueError, AttributeError):
             return False, "Invalid timestamp format. Use ISO 8601 format."
     
@@ -158,7 +159,6 @@ def generate_alert_id() -> str:
     Returns: alert_id string
     """
     return f"alert-{uuid.uuid4()}"
-
 
 # ========== SUBMIT SINGLE ALERT ENDPOINT ==========
 @alert_bp.route('/', methods=['POST'])
@@ -196,18 +196,13 @@ def submit_alert():
     {
         "error": string,
     """
-
-    # Extract client ID from headers
-    headers_client_id, _, _ = extract_security_headers(request.headers)
-    database = Database() # Initialize database connection
-
-    if not headers_client_id:
-        return jsonify({"error": "Missing X-Client-ID header."}), 401
     
     # validate request authentication
-    valid, error_response, status_code = validate_alert_request(headers_client_id)
+    valid, error_response, status_code = validate_alert_request()
     if not valid:
         return jsonify(error_response), status_code
+    
+    headers_client_id, headers_timestamp, headers_signature = extract_security_headers(request.headers)
     
     try:
         # Parse JSON body
@@ -224,25 +219,25 @@ def submit_alert():
         # Generate alert metadata
         alert_id = generate_alert_id()
         # use timezone-aware datetime for DB insertion
-        current_time = dt.datetime.now(dt.timezone.utc)
+        current_time = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
 
         # client timestamp if provided, else use server time
-        alert_timestamp = data.get('timestamp', current_time)
+        alert_timestamp = data.get('timestamp', current_time)  # Should be ISO 8601 with Z
 
         # create alert record
         #* Note: Please see database config in /core/config.py for the alert schema. 
 
         database.store_alerts(
             client_id=headers_client_id,
-            alert_id=alert_id,
-            rule_id=data['event_type'],
+            alert_id=alert_id,              #* Generated unique alert ID
+            rule_id=data['event_type'],   
             severity=data['severity'],
-            score=0,
+            score=0,                        #? Default score, update later with correlation engine
             event_type=data['event_type'],
-            status='unresolved',
+            status='unresolved',            # Default status, update later with acknowledgment or resolution
             created_at=alert_timestamp,
-            acknowledged_at=None,
-            acknowledged_by=None,
+            acknowledged_at=None,           # Default null, update when acknowledged
+            acknowledged_by=None,           # Default null, update with admin ID when acknowledged
             details=data['details'],
             tags=None
         )
@@ -254,16 +249,16 @@ def submit_alert():
             "status": "received",
             "alert_id": alert_id,
             "ack_id": ack_id,
-            "received_at": current_time.isoformat().replace('+00:00', 'Z') if hasattr(current_time, 'isoformat') else str(current_time),
+            "received_at": current_time,
             "severity": data['severity']
         }), 201
     
     except Exception as e:
         return jsonify({"error": f"Error processing alert: {str(e)}"}), 500
     
-# ========== SUBMIT BULK ALERTS ENDPOINT ========== #TODO: Change endpoint to integrate with database
+# ========== SUBMIT BULK ALERTS ENDPOINT ==========
 @alert_bp.route('/bulk', methods=['POST'])
-def submit_bulk_alerts():
+def submit_bulk_alerts(): #TODO: Change endpoint to integrate with database
     """
     Submit multiple alerts in a single request.
     
@@ -329,11 +324,11 @@ def submit_bulk_alerts():
         processed_alerts = []
         failed_alerts = []
 
-        for idx, alert_data in enumerate(data['alerts']):
-            # vaidate alert data structure
+        for idx, alert_data in enumerate(data['alerts']): # 
+            # vaidate alert data stjructure
             valid_data, data_error = validate_alert_data(alert_data)
 
-            if not valid_data:
+            if not valid_data: # if not valid alert append index number and error to failed_alerts array and continue
                 failed_alerts.append({
                     "index": idx,
                     "error": data_error
@@ -342,41 +337,40 @@ def submit_bulk_alerts():
 
             # Generate alert metadata
             alert_id = generate_alert_id()
-            alert_timestamp = alert_data.get('timestamp', current_time)
+            alert_timestamp = alert_data.get('timestamp', current_time)  # Should be ISO 8601 with Z
 
             # create alert record
-            alert_record = {
-                "alert_id": alert_id,
-                "client_id": headers_client_id,
-                "severity": alert_data['severity'],
-                "event_type": alert_data['event_type'],
-                "timestamp": alert_timestamp,
-                "received_at": current_time,
-                "acknowledged": False,
-                "acknowledged_at": None,
-                "acknowledged_by": None,
-                "details": alert_data['details']
-            }
-        
-            # Store alert in MOCK storage
-            MOCK_ALERTS[alert_id] = alert_record
-            processed_alerts.append(alert_id)
+            database.store_alerts(
+                client_id=headers_client_id,
+                alert_id=alert_id,
+                rule_id=alert_data['event_type'],
+                severity=alert_data['severity'],
+                score=0,
+                event_type=alert_data['event_type'],
+                status='unresolved',
+                created_at=alert_timestamp,
+                acknowledged_at=None,
+                acknowledged_by=None,
+                details=alert_data['details'],
+                tags=None
+            )
+            processed_alerts.append(alert_id) # append alert ID to processed_alerts array for tracking
         
         return jsonify({
             "status": "received",
-            "alerts_processed": len(processed_alerts),
+            "alerts_processed": len(processed_alerts), # return number of successfully processed alerts
             "alert_ids": processed_alerts,
-            "failed": len(failed_alerts),
-            "failed_details": failed_alerts if failed_alerts else None,
+            "failed": len(failed_alerts), # return number of failed alerts
+            "failed_details": failed_alerts if failed_alerts else None, # return details of failed alerts if any
             "received_at": current_time
         }), 201
     
     except Exception as e:
         return jsonify({"error": f"Error processing bulk alerts: {str(e)}"}), 500
     
-# =========== Acknowledge alert endpoint ========== #TODO: Change endpoint to integrate with database
+# =========== Acknowledge alert endpoint ==========
 @alert_bp.route('/acknowledge/<alert_id>', methods=['POST'])
-def acknowledge_alert(alert_id):
+def acknowledge_alert(alert_id): #TODO: Change endpoint to integrate with database
     """
     Mark an alert as acknowledged by an administrator.
 
@@ -433,7 +427,7 @@ def acknowledge_alert(alert_id):
     
 # ========== GET ALERT HISTORY ENDPOINT ==========
 @alert_bp.route('/', methods=['GET'])
-def get_alert_history():
+def get_alert_history(): #TODO: Change endpoint to integrate with database
     """
     Retrieve alert history with optional filters.
 
@@ -511,7 +505,7 @@ def get_alert_history():
 
 # ============ GET SINGLE ALERT ENDPOINT ============
 @alert_bp.route('/<alert_id>', methods=['GET'])
-def get_single_alert(alert_id):
+def get_single_alert(alert_id): #TODO: Change endpoint to integrate with database
     """
     Get details of a single alert by its ID.
 
@@ -544,20 +538,3 @@ def get_single_alert(alert_id):
         return jsonify({
             "error": f"Failed to retrieve alert: {str(e)}"
         }), 500
-    
-# =========== HELPER ENDPOINT: REGISTER CLIENT (FOR TESTING) ===========
-@alert_bp.route('/register_client/<client_id>', methods=['POST'])
-def register_client_for_alerts(client_id: str):
-    """
-    Helper endpoint to register a client for alert testing.
-
-    NOTE: This is a temporary testing endpoint and should be removed in production.
-    """
-
-    MOCK_REGISTERED_CLIENTS.add(client_id)
-    return jsonify({
-        "message": "Client registered for alerts.",
-        "client_id": client_id
-    }), 201
-
-# End of alert_endpoints.py
