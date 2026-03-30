@@ -25,15 +25,19 @@ Timestamp Validation:
     Requests must be recent (within x seconds). preventing replaying old requests.
 """
 
-import hmac, hashlib, time, uuid
+import hmac, hashlib, uuid
 import datetime as dt
 from typing import Tuple, Optional
-from src.server.core.database import Database
+from src.server.core.database import Database # unused import currently
+from src.server.utils.timestamper import parse_timestamp
 
-MAX_TIMESTAMP_AGE = 300 # 5 minutes
-VALID_ALGORITHMS = ['sha256'] # Supported HMAC algorithms
+MAX_TIMESTAMP_AGE = 300  # 5 minutes
+VALID_ALGORITHMS = ["sha256"]  # Supported HMAC algorithms
 
-def validate_timestamp(timestamp: str, max_age: int = MAX_TIMESTAMP_AGE) -> Tuple[bool, str]:
+
+def validate_timestamp(
+    timestamp: str, max_age: int = MAX_TIMESTAMP_AGE
+) -> Tuple[bool, str]:
     """
     Validate the provided timestamp (ISO8601 with 'Z') to ensure it's within the allowed age.
 
@@ -44,7 +48,7 @@ def validate_timestamp(timestamp: str, max_age: int = MAX_TIMESTAMP_AGE) -> Tupl
     Returns:
         Tuple[bool, str]: A tuple containing a boolean indicating validity and an error message if invalid.
     """
-    from src.server.utils.timestamper import parse_timestamp
+
     try:
         request_time = parse_timestamp(timestamp)
     except Exception:
@@ -57,16 +61,17 @@ def validate_timestamp(timestamp: str, max_age: int = MAX_TIMESTAMP_AGE) -> Tupl
         return False, "Timestamp is too old."
     return True, ""
 
+
 def validate_signature(
-        client_id: str,
-        timestamp: str,
-        body: str,
-        received_signature: str,
-        secret_key: str,
+    client_id: str,
+    timestamp: str,
+    body: str,
+    received_signature: str,
+    secret_key: str,
 ) -> Tuple[bool, str]:
     """
     Validate the HMAC signature.
-    
+
     How HMAC Works:
     ----------------
     1. Client creates message: client_id + timestamp + body
@@ -77,7 +82,7 @@ def validate_signature(
 
     Args:
         client_id (str): UUID of the client making the request.
-        timestamp (str): Unix timestamp from X-Timestamp header.
+        timestamp (str): ISO8601 timestamp from X-Timestamp header.
         body (str): The Raw request body as bytes.
         received_signature (str): The HMAC signature from X-Signature header.
         secret_key (str): The shared secret key.
@@ -87,42 +92,43 @@ def validate_signature(
 
     Example:
         X-Client_ID: 123e4567-e89b-12d3-a456-426614174000
-        X-Timestamp: 1700000000
+        X-Timestamp: 2024-06-01T12:00:00Z
         X-Signature: sha256=abcdef1234567890...
-        
+
         Body: {"data":"value", "other":"info"}
     """
 
     try:
         # Parse signature format: "algorithm=signature"
-        if '=' not in received_signature:
+        if "=" not in received_signature:
             return False, "Invalid signature format."
 
-        algorithm, signature = received_signature.split('=', 1)
+        algorithm, signature = received_signature.split("=", 1)
 
         # verify algorithm
         if algorithm not in VALID_ALGORITHMS:
             return False, "Unsupported signature algorithm."
-        
+
         # Construct the message
-        message = f"{client_id}{timestamp}".encode('utf-8') + body
+        message = f"{client_id}{timestamp}".encode("utf-8") + body
 
         # Compute HMAC
         expected_signature = hmac.new(
-            key=secret_key.encode('utf-8'), #shared secret key
-            msg=message,                    # data being authenticated
-            digestmod=hashlib.sha256        # hashing algorithm
+            key=secret_key.encode("utf-8"),  # shared secret key
+            msg=message,  # data being authenticated
+            digestmod=hashlib.sha256,  # hashing algorithm
         ).hexdigest()
 
         # Compare signatures
         if not hmac.compare_digest(signature, expected_signature):
             return False, "signature mismatch - request rejected."
-        
+
         return True, ""
 
     except Exception as e:
         return False, f"Error validating signature: {str(e)}"
-    
+
+
 def generate_ack_id() -> str:
     """
     Generate a unique ack ID for tracking requests.
@@ -140,7 +146,10 @@ def generate_ack_id() -> str:
 
     return str(uuid.uuid4())
 
-def extract_security_headers(headers: dict) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+
+def extract_security_headers(
+    headers: dict,
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Extract and validate security headers from the request.
 
@@ -149,7 +158,7 @@ def extract_security_headers(headers: dict) -> Tuple[Optional[str], Optional[str
 
     Returns:
         tuple of (client_id, timestamp, signature) or (None, None, None) if any are missing.
-    
+
     Example Usage:
         client_id, timestamp, signature = extract_security_headers(request.headers)
         if not client_id:
@@ -157,9 +166,9 @@ def extract_security_headers(headers: dict) -> Tuple[Optional[str], Optional[str
     """
 
     # Extract headers (case-insensitive lookup)
-    client_id = headers.get('X-Client-ID')
-    timestamp = headers.get('X-Timestamp')
-    signature = headers.get('X-Signature')
+    client_id = headers.get("X-Client-ID")
+    timestamp = headers.get("X-Timestamp")
+    signature = headers.get("X-Signature")
 
     # Validate presence
     if not all([client_id, timestamp, signature]):

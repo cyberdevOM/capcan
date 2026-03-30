@@ -5,7 +5,11 @@ disable=
     C0114,  # missing-module-docstring
     C0115,  # missing-class-docstring
     C0116,  # missing-function-docstring
-    #E0401,  # import-error
-
+    C0410,  # multiple-imports
+    C0411,  # standard-imports-first
+    C0301,  # line-too-long
+    W0611,  # unused-import
+    W0621,  # redefined-outer-name
 
 ## DATE ADDED 2026-02-28
+## Modified 2026-02-30
