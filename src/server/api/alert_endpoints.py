@@ -6,7 +6,7 @@ import datetime as dt
 from typing import Dict, Any, List
 from src.server.utils.timestamper import parse_timestamp, get_current_timestamp
 import uuid
-
+from werkzeug.exceptions import BadRequest
 from ..utils.validators import (
     validate_timestamp,
     validate_signature,
@@ -60,8 +60,10 @@ def validate_alert_request() -> tuple[bool, Dict[str, Any], int]:
 
     # Extract security headers
     headers_client_id, timestamp, signature = extract_security_headers(request.headers)
+    print(f"[DEBUG] validate_alert_request: headers_client_id={headers_client_id}, timestamp={timestamp}, signature={signature}", flush=True)
 
     if not headers_client_id:
+        print("[DEBUG] Missing security headers", flush=True)
         return (
             False,
             {
@@ -73,12 +75,17 @@ def validate_alert_request() -> tuple[bool, Dict[str, Any], int]:
 
     # Validate timestamp
     valid_time, time_error = validate_timestamp(timestamp)
+    print(f"[DEBUG] Timestamp valid: {valid_time}, error: {time_error}", flush=True)
     if not valid_time:
+        print("[DEBUG] Invalid timestamp", flush=True)
         return False, {"error": f"Invalid timestamp: {time_error}"}, 401
 
     # Validate client ID matches
-
-    if database.get_client_by_id(headers_client_id) is None:
+    print(f"[DEBUG] Checking client registration for {headers_client_id}", flush=True)
+    client_check = database.get_client_by_id(headers_client_id)
+    print(f"[DEBUG] database.get_client_by_id returned: {client_check}", flush=True)
+    if client_check is None:
+        print("[DEBUG] Client not registered", flush=True)
         return (
             False,
             {
@@ -227,7 +234,10 @@ def submit_alert():
 
     try:
         # Parse JSON body
-        data = request.get_json()
+        try: 
+            data = request.get_json()
+        except BadRequest: 
+            return jsonify({"error": "Malformed JSON payload."}), 400
 
         if not data:
             return jsonify({"error": "No alert data provided."}), 400
@@ -288,7 +298,7 @@ def submit_alert():
 @alert_bp.route("/bulk", methods=["POST"])
 def submit_bulk_alerts():  # TODO: Change endpoint to integrate with database
     """
-    Submit multiple alerts in a single request.
+    Submit multiple alerts in a sprint(f"[DEBUG] Exception in submit_bulk_alerts: {e}", flush=True)ingle request.
 
     Endpoint: POST /api/alerts/bulk
 
@@ -332,13 +342,16 @@ def submit_bulk_alerts():  # TODO: Change endpoint to integrate with database
         return jsonify({"error": "Missing X-Client-ID header."}), 401
 
     # validate request authentication
-    valid, error_response, status_code = validate_alert_request(headers_client_id)
+    valid, error_response, status_code = validate_alert_request()
     if not valid:
         return jsonify(error_response), status_code
-
+    
     try:
         # parse bulk alert data
-        data = request.get_json()
+        try: 
+            data = request.get_json()
+        except BadRequest: 
+            return jsonify({"error": "Malformed JSON payload."}), 400
 
         if not data or "alerts" not in data:
             return jsonify({"error": "No alerts array provided."}), 400
@@ -347,28 +360,20 @@ def submit_bulk_alerts():  # TODO: Change endpoint to integrate with database
             return jsonify({"error": "alerts must be an array/list."}), 400
 
         # Process each alert
-
-        current_time = dt.datetime.now(dt.timezone.utc).isoformat() + "Z"
+        current_time = get_current_timestamp()
         processed_alerts = []
         failed_alerts = []
 
-        for idx, alert_data in enumerate(data["alerts"]):  #
-            # vaidate alert data stjructure
+        for idx, alert_data in enumerate(data["alerts"]):
             valid_data, data_error = validate_alert_data(alert_data)
 
-            if (
-                not valid_data
-            ):  # if not valid alert append index number and error to failed_alerts array and continue
+            if not valid_data:
                 failed_alerts.append({"index": idx, "error": data_error})
                 continue
 
             # Generate alert metadata
             alert_id = generate_alert_id()
-            alert_timestamp = alert_data.get(
-                "timestamp", current_time
-            )  # Should be ISO 8601 with Z
-
-            # create alert record
+            alert_timestamp = alert_data.get("timestamp", current_time)
             database.store_alerts(
                 client_id=headers_client_id,
                 alert_id=alert_id,
@@ -383,22 +388,16 @@ def submit_bulk_alerts():  # TODO: Change endpoint to integrate with database
                 details=alert_data["details"],
                 tags=None,
             )
-            processed_alerts.append(
-                alert_id
-            )  # append alert ID to processed_alerts array for tracking
+            processed_alerts.append(alert_id)
 
         return (
             jsonify(
                 {
                     "status": "received",
-                    "alerts_processed": len(
-                        processed_alerts
-                    ),  # return number of successfully processed alerts
+                    "alerts_processed": len(processed_alerts),
                     "alert_ids": processed_alerts,
-                    "failed": len(failed_alerts),  # return number of failed alerts
-                    "failed_details": (
-                        failed_alerts if failed_alerts else None
-                    ),  # return details of failed alerts if any
+                    "failed": len(failed_alerts),
+                    "failed_details": (failed_alerts if failed_alerts else None),
                     "received_at": current_time,
                 }
             ),
