@@ -1,11 +1,16 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, session, url_for
 
 from .templates.pre_renders import dashboard_prerender
 from .templates.pre_renders import clients_prerender
 from .templates.pre_renders import settings_prerender
 
+from ..api import register_api_blueprints
+
 # Initialize the Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')
+
+# Register API blueprints
+register_api_blueprints(app)
 
 @app.route('/')
 @app.route('/dashboard')
@@ -17,7 +22,8 @@ def Dashboard():
         'network_status_html': dashboard_prerender.render_network_status(),
         'alerts_html': dashboard_prerender.render_alerts(),
     }
-
+    if not session.get('user_id'):
+        return redirect('/login')
     return render_template(
         'Capcan-html-home.html',
         **context
@@ -29,6 +35,9 @@ def Clients():
         'client_list_html': clients_prerender.render_client_list(),
         'client_details_html': clients_prerender.render_client_details(),
     }
+
+    if not session.get('user_id'):
+        return redirect('/login')
     return render_template(
         'Capcan-html-clients.html',
         **context
@@ -43,7 +52,8 @@ def Settings():
         'security_settings_html': settings_prerender.render_security_settings(),
         'notification_settings_html': settings_prerender.render_notification_settings(),
     }
-
+    if not session.get('user_id'):
+        return redirect('/login')
     return render_template(
         'Capcan-html-settings.html',
         **context

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link rel="stylesheet" href="/static/Capcan-css-login.css">
+    <script src="/static/scripts/login.js"></script>
+</head>
+<body class="login-bg">
+    <div class="login-container">
+        <form class="login-form" method="POST" action="/login">
+            <div class="glass-panel">
+                <h2 class="login-title">Sign in</h2>
+                <div class="input-group">
+                    <input type="text" name="username" placeholder="Username" class="login-input" autofocus required>
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" placeholder="Password" class="login-input" required>
+                </div>
+                <button type="submit" class="login-btn">Sign in</button>
+                <div class="login-footer">
+                    <span>Don&#39;t have an account?</span>
+                    <a href="/register" class="register-link">Register for free</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

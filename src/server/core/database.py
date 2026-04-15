@@ -16,10 +16,12 @@ The class uses psycopg2 for database interactions and includes error handling to
 The class imports environment variables for database connection parameters.
 """
 
+from flask import jsonify
 import psycopg2
 import os
 from dotenv import load_dotenv as load_env
 from enum import Enum
+import uuid
 
 
 class Database:
@@ -46,11 +48,13 @@ class Database:
             print("Database connection closed.")
 
     # ============== WEB USER MANAGEMENT ==============
-    def create_web_user(self, username, pass_hash):
-        try:
+    def create_web_user(self, username, pass_hash, email):
+        user_id = str(uuid.uuid4())
+        
+        try: # create a new web user in the auth table with the provided username and password hash
             self.cursor.execute(
-                "INSERT INTO auth (username, pass_hash) VALUES (%s, %s);",
-                (username, pass_hash),
+                "INSERT INTO auth (user_id, username, pass_hash) VALUES (%s, %s, %s);",
+                (user_id, username, pass_hash),
             )
             self.conn.commit()
             print(f"Web user '{username}' created successfully.")
@@ -60,8 +64,70 @@ class Database:
                 self.conn.rollback()
             print(f"Failed to create web user '{username}'.")
 
+        try: # store additional user information in the user_permissions table, such as email, role, and permissions
+            self.cursor.execute(
+                "INSERT INTO user_permissions (user_id, email, display_name) values (%s, %s, %s);",
+                (user_id, email, username),
+            )
+            self.conn.commit()
+            print(f"User permissions for '{username}' created successfully.")
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            print(f"Failed to create user permissions for '{username}'.")
+    
+    def update_web_user(self, user_id, email=None, display_name=None, role=None, permissions=None):
+        pass  # update web user information in the database, used for user management and role/permission updates
+
+    def delete_web_user(self, user_id):
+        try:
+            self.cursor.execute("DELETE FROM auth WHERE user_id = %s;", (user_id,))
+            self.conn.commit()
+            print(f"Web user with user_id '{user_id}' deleted successfully.")
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            print(f"Failed to delete web user with user_id '{user_id}'.")
+
+    def get_web_user_id(self, username):
+        try:
+            self.cursor.execute("SELECT user_id FROM user_permissions WHERE display_name = %s", (username,))
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            return None
+
     def get_web_user(self, username):
-        pass  # retrieve web user information from the database for authentication and user management
+        try:
+            self.cursor.execute("SELECT * FROM user_permissions WHERE display_name = %s", (username,))
+            return self.cursor.fetchone()
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            return None
+    
+    def get_user_auth(self, username):
+        """Retrieve the stored password hash for a given username from the database."""
+        try:
+            self.cursor.execute(
+                "SELECT pass_hash FROM auth WHERE username = %s", (username,)
+            )
+            result = self.cursor.fetchone()
+            if result:
+                return result[0]
+            else:
+                return None
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            return None
 
     def get_config_by_client(self, client_id):
         pass  # retrieve configuration data for a specific client, used for applying configurations on the client side

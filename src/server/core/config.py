@@ -32,7 +32,8 @@ class Config:
             "STATUS": "CREATE TYPE STATUS AS ENUM ('active', 'inactive', 'suspended');",
             "ALERT_SEVERITY": "CREATE TYPE ALERT_SEVERITY AS ENUM ('critical', 'high','medium','low', 'info', 'undefined');",
             "ALERT_STATUS": "CREATE TYPE ALERT_STATUS AS ENUM ('unresolved', 'acknowledged', 'resolved');",
-            "CHANGE_STATUS": "CREATE TYPE CHANGE_STATUS AS ENUM ('active', 'inactive', 'pending', 'approved', 'rejected');"
+            "CHANGE_STATUS": "CREATE TYPE CHANGE_STATUS AS ENUM ('active', 'inactive', 'pending', 'approved', 'rejected');",
+            "ROLE": "CREATE TYPE ROLE AS ENUM ('admin', 'analyst', 'read-only');"
         }
         try:
             for enum_name, query in enums.items():
@@ -186,6 +187,7 @@ class Config:
         query = """
         CREATE TABLE IF NOT EXISTS auth (
             user_id VARCHAR(255) PRIMARY KEY NOT NULL,
+            username VARCHAR(255) UNIQUE NOT NULL,
             pass_hash VARCHAR(255) NOT NULL
         );
         """
@@ -201,8 +203,8 @@ class Config:
             is_active BOOLEAN DEFAULT TRUE,
             is_admin BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            roles TEXT[] DEFAULT NULL,
-            permissions TEXT[] DEFAULT NULL,
+            role ROLE DEFAULT 'read-only',
+            permissions TEXT[] DEFAULT ARRAY['READ', 'VIEW'],
 
             PRIMARY KEY (user_id, email),
             FOREIGN KEY (user_id) REFERENCES auth(user_id) ON DELETE CASCADE ON UPDATE CASCADE

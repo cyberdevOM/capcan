@@ -9,11 +9,8 @@ def create_app(testing=False):
     app.config['TESTING'] = testing
     
     # Register API blueprints
-    from .api.client_endpoints import client_bp
-    from .api.alert_endpoints import alert_bp
-    app.register_blueprint(client_bp)
-    app.register_blueprint(alert_bp)
-    
+    from .api import register_api_blueprints
+    register_api_blueprints(app)
     return app
 
 
