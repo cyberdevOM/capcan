@@ -1,16 +1,27 @@
+import os
 from flask import Flask, render_template, redirect, session, url_for
+from dotenv import load_dotenv
 
 from .templates.pre_renders import dashboard_prerender
 from .templates.pre_renders import clients_prerender
 from .templates.pre_renders import settings_prerender
 
 from ..api import register_api_blueprints
+from ..core.database import Database
+
+load_dotenv()
 
 # Initialize the Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')
+app.config['SECRET_KEY'] = os.getenv('WEB_SECRET_KEY')
 
 # Register API blueprints
 register_api_blueprints(app)
+
+# Create default web user on startup if it does not already exist
+_db = Database()
+_db.create_default_web_user()
+_db.close()
 
 @app.route('/')
 @app.route('/dashboard')

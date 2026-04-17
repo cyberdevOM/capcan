@@ -1,13 +1,21 @@
 import json
 import os
 from flask import Flask
+from .core.database import Database
 
 
 def create_app(testing=False):
     # Create Flask app in testing or production mode
     app = Flask(__name__)
     app.config['TESTING'] = testing
-    
+
+    #TODO check for first initalization, create database and tables if not exist.
+
+    # Database default user setup
+    db = Database()
+    db.create_default_web_user()
+    db.close()
+
     # Register API blueprints
     from .api import register_api_blueprints
     register_api_blueprints(app)

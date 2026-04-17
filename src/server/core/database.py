@@ -22,6 +22,7 @@ import os
 from dotenv import load_dotenv as load_env
 from enum import Enum
 import uuid
+from ..utils.encryptors import hash_password, pre_hash_client_password
 
 
 class Database:
@@ -76,7 +77,30 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             print(f"Failed to create user permissions for '{username}'.")
-    
+
+    def create_default_web_user(self):
+        load_env()
+        default_username = os.getenv("WEB_DEFAULT_USER")
+        default_password = os.getenv("WEB_DEFAULT_PASSWORD")
+        default_email = os.getenv("WEB_DEFAULT_EMAIL")
+        default_exists = self.get_web_user(default_username)
+        print(default_exists)
+        if default_username and default_password and default_email and not default_exists:
+            print(f"Creating default web user '{default_username}'...")
+            # Pre-hash with the fixed client salt to match what the browser sends,
+            # then bcrypt again with a random server salt for storage.
+            client_hash = pre_hash_client_password(default_password)
+            pass_hash = hash_password(client_hash)
+            try:
+                self.create_web_user(default_username, pass_hash, default_email)
+            except (psycopg2.DatabaseError, Exception) as error:
+                print(error)
+                if self.conn:
+                    self.conn.rollback()
+                print(f"Failed to create default web user '{default_username}'.")
+        else:
+            print(f"Default web user '{default_username}' already exists or environment variables are not set.")
+
     def update_web_user(self, user_id, email=None, display_name=None, role=None, permissions=None):
         pass  # update web user information in the database, used for user management and role/permission updates
 

@@ -1,6 +1,6 @@
 import pytest
 from src.server.core.database import Database
-from src.server.utils.encryptors import hash_password, check_password
+from src.server.utils.encryptors import hash_password, check_password, pre_hash_client_password
 @pytest.fixture
 def database():
     database = Database()
@@ -31,11 +31,12 @@ def clean():
 def test_create_web_user(database):
     try:
         password = "test_password"
-        password_hash = hash_password(password)
+        client_hash = pre_hash_client_password(password)
+        password_hash = hash_password(client_hash)
 
         database.create_web_user("test_user_name", password_hash, "test_email@example.com")
 
-        assert check_password(password, password_hash) == True
+        assert check_password(client_hash, password_hash) == True
 
         database.cursor.execute("SELECT * FROM user_permissions WHERE display_name = 'test_user_name'")
         result = database.cursor.fetchone()
@@ -63,6 +64,6 @@ def test_get_user_auth(database):
         auth = database.get_user_auth("test_user_name")
         assert auth is not None
         # get_user_auth returns the password hash string directly
-        assert check_password("test_password", auth) == True
+        assert check_password(pre_hash_client_password("test_password"), auth) == True
     except Exception as e:
         pytest.fail(f"Failed to get user auth: {e}")

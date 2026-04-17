@@ -1,0 +1,2 @@
+[console_scripts]
+capcan.start = src.server.web.__main__:main

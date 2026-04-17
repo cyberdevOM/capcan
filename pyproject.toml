@@ -19,6 +19,9 @@ dependencies = [
     "pyinstaller==6.19.0",
 ]
 
+[project.scripts]
+"capcan.start" = "src.server.web.__main__:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
