@@ -149,17 +149,17 @@ function initializeMasonryLayout() {
 }
 
 function initializeSettings() {
+    // Apply dark mode on every page, not just when the toggle exists
+    const savedPreference = localStorage.getItem('darkMode') !== 'false';
+    document.body.classList.toggle('dark-mode', savedPreference);
+
     const darkModeToggle = document.getElementById('darkModeToggle');
     if (darkModeToggle) {
-        // Load saved preference - future impl
+        darkModeToggle.checked = savedPreference;
         darkModeToggle.addEventListener('change', function () {
-            document.body.classList.toggle('dark-mode', this.checked)
+            document.body.classList.toggle('dark-mode', this.checked);
             localStorage.setItem('darkMode', this.checked);
         });
-
-        const savedPreference = localStorage.getItem('darkMode') === 'true';
-        darkModeToggle.checked = savedPreference;
-        document.body.classList.toggle('dark-mode', savedPreference);
     }
 
     const themeOptions = document.querySelectorAll('.theme-option');
@@ -205,6 +205,18 @@ function initializeSettings() {
     });
 
     // Other settings controls
+}
+
+function changePassword() {
+    console.log('changePassword — not yet implemented');
+}
+
+function saveDisplayName() {
+    console.log('saveDisplayName — not yet implemented');
+}
+
+function saveEmail() {
+    console.log('saveEmail — not yet implemented');
 }
 
 function selectClient(clientId) {
@@ -272,14 +284,58 @@ function initializeClientSearch() {
     }
 }
 
+function initializeSettingsNav() {
+    const navItems = document.querySelectorAll('.settings-nav-item');
+    if (!navItems.length) return;
+
+    function activatePanel(panelName) {
+        const panel = document.getElementById('panel-' + panelName);
+        if (!panel) return;
+        navItems.forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+        const navItem = document.querySelector(`.settings-nav-item[data-panel="${panelName}"]`);
+        if (navItem) navItem.classList.add('active');
+        panel.classList.add('active');
+    }
+
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const target = item.dataset.panel;
+            activatePanel(target);
+            history.replaceState(null, '', '#' + target);
+        });
+    });
+
+    // Activate panel from URL hash on load
+    const hash = window.location.hash.replace('#', '');
+    if (hash && document.getElementById('panel-' + hash)) {
+        activatePanel(hash);
+    }
+}
+
+function initializePasswordToggles() {
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.toggle-password');
+        if (!btn) return;
+        const input = document.getElementById(btn.dataset.target);
+        if (!input) return;
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = isHidden ? 'fas fa-eye-slash' : 'fas fa-eye';
+    });
+}
+
 // Initialize the profile icon when the page loads
 document.addEventListener('DOMContentLoaded', function () {
     initializeProfileIcon(); // Profile icon functionality
     initializeHamburgerMenu(); // Hamburger menu functionality
     initializeMasonryLayout(); // Masonry layout for dashboard
     initializeSettings(); // Settings page functionality
+    initializeSettingsNav(); // Settings sidebar navigation
     initializeClientSearch(); // Client search functionality
     initializeDebugGrid(); // Debugging helpers
+    initializePasswordToggles(); // Show/hide password buttons
 });
 
 /// === DEBUGGING HELPERS === ///

@@ -1,20 +1,152 @@
 {% extends "base.html" %}
-{% block title %} Settings - Capcan {% endblock %}
-{% from "components/modular_block.html" import modular_block %}
+{% block title %}Settings - Capcan{% endblock %}
 
 {% block stylesheets %}
 <link rel="stylesheet" href="{{ url_for('static', filename='Capcan-css-Settings.css') }}">
 {% endblock %}
 
 {% block content %}
-    <h1 class="settings-title">Settings</h1>
+<div class="settings-layout">
 
-    <div class="settings-grid" id="TilesGrid">
-        {{ modular_block("Dashboard", dashboard_settings_html, "xs") }}
-        {{ modular_block("Client Systems", client_settings_html, "medium") }}
-        {{ modular_block("Notifications", notification_settings_html, "xs") }}
-        {{ modular_block("Appearance", appearance_settings_html, "medium") }}
-        {{ modular_block("Security & Users", security_settings_html, "small") }}
-        {{ modular_block("Advanced", advanced_settings_html, "medium") }}
-    </div>
+    <!-- ── Left navigation ── -->
+    <nav class="settings-nav" id="settingsNav">
+        <div class="settings-nav-header">Settings</div>
+        <ul class="settings-nav-list">
+            <li class="settings-nav-item active" data-panel="account">
+                <i class="fas fa-user settings-nav-icon"></i>
+                <span>Account</span>
+            </li>
+            <li class="settings-nav-item" data-panel="clients">
+                <i class="fas fa-server settings-nav-icon"></i>
+                <span>Clients</span>
+            </li>
+            <li class="settings-nav-item" data-panel="configs">
+                <i class="fas fa-file-code settings-nav-icon"></i>
+                <span>Configs</span>
+            </li>
+            <li class="settings-nav-item" data-panel="web">
+                <i class="fas fa-globe settings-nav-icon"></i>
+                <span>Web</span>
+            </li>
+            {% if user_role == 'admin' %}
+            <li class="settings-nav-item" data-panel="users">
+                <i class="fas fa-users-cog settings-nav-icon"></i>
+                <span>Users</span>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+
+    <!-- ── Right content ── -->
+    <div class="settings-content">
+
+        <!-- Account panel -->
+        <div class="settings-panel active" id="panel-account">
+            <h2 class="settings-panel-title">Account</h2>
+
+            <div class="settings-section">
+                <h3 class="settings-section-title">Profile</h3>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-label">Display Name</div>
+                        <div class="setting-description">Update your display name.</div>
+                    </div>
+                    <div class="setting-control">
+                        <input type="text" class="settings-text-input" id="updateDisplayName"
+                               value="{{ current_user.display_name | default('') }}"
+                               placeholder="Display name">
+                        <button class="settings-btn settings-btn-primary" onclick="saveDisplayName()">Save</button>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-label">Email</div>
+                        <div class="setting-description">Update your email address.</div>
+                    </div>
+                    <div class="setting-control">
+                        <input type="email" class="settings-text-input" id="updateEmail"
+                               value="{{ current_user.email | default('') }}"
+                               placeholder="Email address">
+                        <button class="settings-btn settings-btn-primary" onclick="saveEmail()">Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                {{ account_settings_html }}
+            </div>
+        </div>
+
+        <!-- Clients panel -->
+        <div class="settings-panel" id="panel-clients">
+            <h2 class="settings-panel-title">Clients</h2>
+            <div class="settings-section">
+                {{ client_settings_html }}
+            </div>
+        </div>
+
+        <!-- Configs panel -->
+        <div class="settings-panel" id="panel-configs">
+            <h2 class="settings-panel-title">Configs</h2>
+            {{ configs_settings_html }}
+        </div>
+
+        <!-- Web panel -->
+        <div class="settings-panel" id="panel-web">
+            <h2 class="settings-panel-title">Web</h2>
+            {{ web_settings_html }}
+        </div>
+
+        {% if user_role == 'admin' %}
+        <!-- Users panel — admin only -->
+        <div class="settings-panel" id="panel-users">
+            <h2 class="settings-panel-title">Users</h2>
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <h3 class="settings-section-title">Manage Users</h3>
+                    <a href="{{ url_for('Register') }}" class="settings-btn settings-btn-primary">
+                        <i class="fas fa-plus"></i> Add User
+                    </a>
+                </div>
+                <div class="users-table-wrapper">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Active</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users_list %}
+                            <tr>
+                                <td>{{ user.display_name }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    <span class="role-badge role-{{ user.role | replace('-', '') }}">
+                                        {{ user.role }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-dot {% if user.is_active %}status-active{% else %}status-inactive{% endif %}"></span>
+                                </td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else '—' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="empty-state">No users found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div><!-- /settings-content -->
+</div><!-- /settings-layout -->
 {% endblock %}
+

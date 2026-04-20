@@ -49,10 +49,18 @@ class Database:
             print("Database connection closed.")
 
     # ============== WEB USER MANAGEMENT ==============
-    def create_web_user(self, username, pass_hash, email):
+    # Role to permissions mapping
+    ROLE_PERMISSIONS = {
+        'admin': ['ALL'],
+        'analyst': ['READ', 'VIEW', 'WRITE', 'MANAGE'],
+        'read-only': ['READ', 'VIEW']
+    }
+
+    def create_web_user(self, username, pass_hash, email, role='read-only'):
         user_id = str(uuid.uuid4())
-        
-        try: # create a new web user in the auth table with the provided username and password hash
+        permissions = self.ROLE_PERMISSIONS.get(role, ['READ', 'VIEW'])
+        is_admin = (role == 'admin')
+        try:
             self.cursor.execute(
                 "INSERT INTO auth (user_id, username, pass_hash) VALUES (%s, %s, %s);",
                 (user_id, username, pass_hash),
@@ -65,10 +73,10 @@ class Database:
                 self.conn.rollback()
             print(f"Failed to create web user '{username}'.")
 
-        try: # store additional user information in the user_permissions table, such as email, role, and permissions
+        try:
             self.cursor.execute(
-                "INSERT INTO user_permissions (user_id, email, display_name) values (%s, %s, %s);",
-                (user_id, email, username),
+                "INSERT INTO user_permissions (user_id, email, display_name, is_admin, role, permissions) values (%s, %s, %s, %s, %s, %s);",
+                (user_id, email, username, is_admin, role, permissions),
             )
             self.conn.commit()
             print(f"User permissions for '{username}' created successfully.")
@@ -87,12 +95,11 @@ class Database:
         print(default_exists)
         if default_username and default_password and default_email and not default_exists:
             print(f"Creating default web user '{default_username}'...")
-            # Pre-hash with the fixed client salt to match what the browser sends,
-            # then bcrypt again with a random server salt for storage.
             client_hash = pre_hash_client_password(default_password)
             pass_hash = hash_password(client_hash)
             try:
-                self.create_web_user(default_username, pass_hash, default_email)
+                # Default user is always admin with all permissions
+                self.create_web_user(default_username, pass_hash, default_email, role='admin')
             except (psycopg2.DatabaseError, Exception) as error:
                 print(error)
                 if self.conn:
@@ -152,6 +159,39 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             return None
+
+    _USER_COLS = ['user_id', 'email', 'display_name', 'is_active', 'is_admin', 'created_at', 'role', 'permissions']
+
+    def get_web_user_by_id(self, user_id):
+        """Return the user_permissions row for the given user_id as a dict, or None."""
+        try:
+            self.cursor.execute(
+                "SELECT user_id, email, display_name, is_active, is_admin, created_at, role, permissions "
+                "FROM user_permissions WHERE user_id = %s",
+                (user_id,)
+            )
+            row = self.cursor.fetchone()
+            return dict(zip(self._USER_COLS, row)) if row else None
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            return None
+
+    def get_all_web_users(self):
+        """Return all user_permissions rows as a list of dicts, ordered newest first."""
+        try:
+            self.cursor.execute(
+                "SELECT user_id, email, display_name, is_active, is_admin, created_at, role, permissions "
+                "FROM user_permissions ORDER BY created_at DESC"
+            )
+            rows = self.cursor.fetchall()
+            return [dict(zip(self._USER_COLS, row)) for row in rows]
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            return []
 
     def get_config_by_client(self, client_id):
         pass  # retrieve configuration data for a specific client, used for applying configurations on the client side

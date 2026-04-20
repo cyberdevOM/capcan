@@ -8,7 +8,7 @@
 .client-list-container {
     width: 25%;
     height: 100%;
-    border-right: 3px solid rgba(0, 0, 0, 0.2);
+    border-right: 3px solid var(--divider-color);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -198,7 +198,7 @@
     justify-content: space-between;
     margin-bottom: 2rem;
     padding-bottom: 1rem;
-    border-bottom: 2px solid var(--bg-main);
+    border-bottom: 2px solid var(--divider-color);
 }
 
 .client-header-main {
@@ -254,7 +254,7 @@
     background: var(--bg-card);
     padding: 1rem;
     border-radius: 8px;
-    border: 1px solid var(--bg-main);
+    border: 1px solid var(--divider-color);
 }
 
 .info-label {
@@ -380,7 +380,7 @@
         width: 100%;
         height: 40%;
         border-right: none;
-        border-bottom: 3px solid var(--bg-main);
+        border-bottom: 3px solid var(--divider-color);
     }
 
     .client-details {

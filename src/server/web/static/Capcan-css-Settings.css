@@ -1,9 +1,531 @@
-.settings-title {
-    font-size: 2rem;
-    font-weight: bold;
-    margin: 0.5rem 3rem 2rem 3rem;
+/* ═══════════════════════════════════════════════════
+   Settings page — two-column layout
+   ═══════════════════════════════════════════════════ */
+
+/* Remove main-content padding so the layout fills edge-to-edge */
+.main-content:has(.settings-layout) {
+    padding: 0;
+    overflow: visible;
+}
+
+.settings-layout {
+    display: flex;
+    height: calc(100vh - 3rem);
+    overflow: hidden;
+}
+
+/* ── Left nav ───────────────────────────────────── */
+
+.settings-nav {
+    width: min(18%, 200px);
+    min-width: 110px;
+    flex-shrink: 0;
+    background: var(--bg-card);
+    border-right: 1.5px solid var(--divider-color);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.settings-nav-header {
+    padding: 1.25rem 1rem 0.75rem 1rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.settings-nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+}
+
+.settings-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    user-select: none;
+}
+
+.settings-nav-item:hover {
+    background: var(--bg-main);
     color: var(--text-main);
 }
+
+.settings-nav-item.active {
+    background: var(--bg-main);
+    color: var(--text-main);
+    border-left-color: var(--button-primary-bg);
+    font-weight: 600;
+}
+
+.settings-nav-icon {
+    width: 1rem;
+    text-align: center;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+}
+
+/* ── Right content ──────────────────────────────── */
+
+.settings-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem 2.5rem;
+    min-width: 0;
+}
+
+/* ── Panels ─────────────────────────────────────── */
+
+.settings-panel {
+    display: none;
+}
+
+.settings-panel.active {
+    display: block;
+}
+
+.settings-panel-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin: 0 0 1.5rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--divider-color);
+}
+
+/* ── Sections (groups within a panel) ───────────── */
+
+.settings-section {
+    margin-bottom: 2rem;
+}
+
+.settings-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.settings-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--divider-color);
+}
+
+.settings-section-header .settings-section-title {
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+/* ── Setting rows ───────────────────────────────── */
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--divider-color);
+    gap: 1rem;
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+.setting-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.setting-label {
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.2rem;
+}
+
+.setting-description {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.setting-control {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-shrink: 0;
+}
+
+/* ── Text + number inputs ───────────────────────── */
+
+.settings-text-input,
+.settings-number-input {
+    padding: 0.45rem 0.75rem;
+    border: 1.5px solid var(--input-primary-border, #ccc);
+    border-radius: 8px;
+    background: var(--input-primary-bg, #fff);
+    color: var(--input-primary-text, #222);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.settings-text-input {
+    width: 220px;
+}
+
+.settings-number-input {
+    width: 80px;
+    text-align: center;
+}
+
+.settings-text-input:focus,
+.settings-number-input:focus {
+    border-color: var(--button-primary-bg);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+/* ── Password inputs (reuse from old settings) ──── */
+
+.password-change-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    max-width: 360px;
+    margin-top: 0.5rem;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    position: relative;
+    height: 44px;
+    width: 100%;
+}
+
+.input-group .input {
+    width: 100%;
+    height: 44px;
+    line-height: 44px;
+    padding-left: 2.8rem;
+    border: 1.5px solid var(--input-primary-border, #ccc);
+    border-radius: 10px;
+    outline: none;
+    background: var(--input-primary-bg, #f8fafc);
+    color: var(--input-primary-text, #0d0c22);
+    font-size: 0.95rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+.input-group .input::placeholder {
+    color: #94a3b8;
+}
+
+.input-group .input:focus,
+.input-group .input:hover {
+    border-color: var(--button-primary-bg);
+    background: var(--input-primary-bg);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+.icon {
+    position: absolute;
+    left: 0.9rem;
+    fill: none;
+    width: 1rem;
+    height: 1rem;
+    color: var(--text-secondary);
+}
+
+.input-group .toggle-password {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+}
+
+.input-group:has(.toggle-password) .input {
+    padding-right: 2.8rem;
+}
+
+/* ── Buttons ─────────────────────────────────────── */
+
+.settings-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 1rem;
+    border: 1.5px solid transparent;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.settings-btn-primary {
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    border-color: var(--button-primary-border);
+}
+
+.settings-btn-primary:hover {
+    background: var(--button-primary-bg-hover);
+}
+
+.settings-feedback {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* ── Toggle switch ───────────────────────────────── */
+
+.switch {
+    --button-width: 2.5rem;
+    --button-height: 1.2rem;
+    --toggle-diameter: 0.8rem;
+    --button-toggle-offset: calc((var(--button-height) - var(--toggle-diameter)) / 2.2);
+    --toggle-shadow-offset: 10px;
+    --toggle-wider: 3em;
+    --color-grey: #cccccc;
+    --color-green: #4296f4;
+}
+
+.switch .slider {
+    display: inline-block;
+    width: var(--button-width);
+    height: var(--button-height);
+    background-color: var(--color-grey);
+    border-radius: calc(var(--button-height) / 2);
+    position: relative;
+    transition: 0.3s all ease-in-out;
+    cursor: pointer;
+}
+
+.switch .slider::after {
+    content: "";
+    display: inline-block;
+    width: var(--toggle-diameter);
+    height: var(--toggle-diameter);
+    background-color: #fff;
+    border-radius: calc(var(--toggle-diameter) / 2);
+    position: absolute;
+    top: var(--button-toggle-offset);
+    transform: translateX(var(--button-toggle-offset));
+    box-shadow: var(--toggle-shadow-offset) 0 calc(var(--toggle-shadow-offset) * 4) rgba(0, 0, 0, 0.1);
+    transition: 0.3s all ease-in-out;
+}
+
+.switch input[type="checkbox"]:checked + .slider {
+    background-color: var(--color-green);
+}
+
+.switch input[type="checkbox"]:checked + .slider::after {
+    transform: translateX(calc(var(--button-width) - var(--toggle-diameter) - var(--button-toggle-offset)));
+    box-shadow: calc(var(--toggle-shadow-offset) * -1) 0 calc(var(--toggle-shadow-offset) * 4) rgba(0, 0, 0, 0.1);
+}
+
+.switch input[type="checkbox"] {
+    display: none;
+}
+
+.switch input[type="checkbox"]:active + .slider::after {
+    width: var(--toggle-wider);
+}
+
+.switch input[type="checkbox"]:checked:active + .slider::after {
+    transform: translateX(calc(var(--button-width) - var(--toggle-wider) - var(--button-toggle-offset)));
+}
+
+/* ── Dashboard card toggles ──────────────────────── */
+
+.card-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.5rem;
+}
+
+.card-toggle-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 0.9rem;
+    background: var(--bg-main);
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-main);
+    line-height: 1;
+}
+
+.card-toggle-item span {
+    flex: 1;
+    color: var(--text-main);
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-toggle-item .switch {
+    flex-shrink: 0;
+}
+
+/* ── Colour theme picker ─────────────────────────── */
+
+.theme-picker {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.theme-option {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+}
+
+.theme-option:hover {
+    transform: scale(1.15);
+}
+
+.theme-option.active {
+    border-color: var(--text-main);
+    transform: scale(1.15);
+}
+
+.theme-blue   { background: linear-gradient(135deg, #3498db, #2980b9); }
+.theme-green  { background: linear-gradient(135deg, #27ae60, #229954); }
+.theme-purple { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+.theme-orange { background: linear-gradient(135deg, #f39c12, #e67e22); }
+
+/* ── Placeholder panels ─────────────────────────── */
+
+.settings-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.settings-placeholder-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.4;
+}
+
+.settings-placeholder-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem 0;
+}
+
+.settings-placeholder-sub {
+    font-size: 0.9rem;
+    margin: 0;
+    max-width: 380px;
+}
+
+/* ── Users table ─────────────────────────────────── */
+
+.users-table-wrapper {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1.5px solid var(--divider-color);
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.users-table th {
+    background: var(--bg-main);
+    color: var(--text-secondary);
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.users-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--divider-color);
+    color: var(--text-main);
+}
+
+.users-table tr:last-child td {
+    border-bottom: none;
+}
+
+.users-table tr:hover td {
+    background: var(--bg-main);
+}
+
+.role-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.role-admin    { background: rgba(52, 152, 219, 0.15); color: #2980b9; }
+.role-analyst  { background: rgba(39, 174, 96, 0.15);  color: #229954; }
+.role-readonly { background: rgba(127, 140, 141, 0.15); color: #7f8c8d; }
+
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-active   { background: #27ae60; }
+.status-inactive { background: #bdc3c7; }
+
+.empty-state {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem 0;
+    font-style: italic;
+}
+
 
 .settings-grid {
     /* using Masonry.js for layout */
@@ -18,7 +540,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 1rem 0;
-    border-bottom: 1px solid var(--bg-main);
+    border-bottom: 1px solid var(--divider-color);
 }
 
 .setting-item:last-child {
@@ -101,7 +623,7 @@
 /* --- Dropdown Styles --- */
 .setting-select {
     padding: 0.5rem;
-    border: 1px solid var(--bg-main);
+    border: 1px solid var(--divider-color);
     border-radius: 6px;
     background: var(--bg-card);
     color: var(--text-main);
@@ -145,64 +667,6 @@
     color: var(--text-main);
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--bg-main);
+    border-bottom: 2px solid var(--divider-color);
 }
 
-/* --- Dashboard card Toggles --- */
-.card-toggle-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-}
-
-.card-toggle-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1rem 0.5rem 0;
-    background: var(--bg-card);
-    border-radius: 6px;
-}
-
-/* --- Password Inputs --- */
-.input-group {
-    display: flex;
-    line-height: 30px;
-    align-items: center;
-    position: relative;
-    max-width: 200px;
-
-    margin: 0 0.5rem 0.5rem 0;
-}
-
-.input-group .input {
-  width: 100%;
-  height: 45px;
-  line-height: 30px;
-  padding-left: 3rem;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  outline: none;
-  background-color: #f8fafc;
-  color: #0d0c22;
-  transition: .5s ease;
-}
-
-.input-group .input::placeholder {
-  color: #94a3b8;
-}
-
-.input-group .input:focus, .input-group .input:hover {
-  outline: none;
-  border-color: rgba(129, 140, 248);
-  background-color: #fff;
-  box-shadow: 0 0 0 5px rgb(129 140 248 / 30%);
-}
-
-.icon {
-  position: absolute;
-  left: 1rem;
-  fill: none;
-  width: 1rem;
-  height: 1rem;
-}

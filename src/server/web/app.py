@@ -56,19 +56,27 @@ def Clients():
 
 @app.route('/settings')
 def Settings():
-    context = {
-        'dashboard_settings_html': settings_prerender.render_dashboard_settings(),
-        'appearance_settings_html': settings_prerender.render_appearance_settings(),
-        'client_settings_html': settings_prerender.render_client_settings(),
-        'security_settings_html': settings_prerender.render_security_settings(),
-        'notification_settings_html': settings_prerender.render_notification_settings(),
-    }
     if not session.get('user_id'):
         return redirect('/login')
-    return render_template(
-        'Capcan-html-settings.html',
-        **context
-    )
+
+    db = Database()
+    try:
+        current_user = db.get_web_user_by_id(session['user_id']) or {}
+        user_role = current_user.get('role', 'read-only')
+        users_list = db.get_all_web_users() if user_role == 'admin' else []
+    finally:
+        db.close()
+
+    context = {
+        'current_user': current_user,
+        'user_role': user_role,
+        'users_list': users_list,
+        'account_settings_html': settings_prerender.render_account_settings(),
+        'client_settings_html': settings_prerender.render_client_settings(),
+        'configs_settings_html': settings_prerender.render_configs_settings(),
+        'web_settings_html': settings_prerender.render_web_settings(),
+    }
+    return render_template('Capcan-html-settings.html', **context)
 
 @app.route('/login')
 def Login():

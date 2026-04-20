@@ -1,32 +1,41 @@
 :root {
-            /* === Light Mode Colors === */
+    /* === Light Mode Colors === */
+
     /* === Background Colors === */
     --bg-main: #ebf5fd;
     --bg-card: #f5fbff;
     --bg-card-hover: #ccd8dd;
-    --bg-card-border: #222;
-    --bg-card-border-hover: #34495e;
+    --bg-card-border: rgba(52, 152, 219, 0.2);
+    --bg-card-border-hover: rgba(52, 152, 219, 0.45);
 
     /* === Text Colors === */
     --text-main: #222;
     --text-secondary: #34495e;
     --text-hover: #19183b;
-    --text-active: #708993;
+    --text-active: #3498db;
 
     /* === Shadows === */
     --shadow: 0 2px 12px rgba(0, 0, 0, 0.17);
     --shadow-secondary: 0 2px 4px rgba(0, 0, 0, 0.1);
 
+    /* === Accent & Dividers === */
+    --accent-primary: #3498db;
+    --accent-primary-hover: #2980b9;
+    --accent-subtle: rgba(52, 152, 219, 0.08);
+    --divider-color: rgba(52, 152, 219, 0.15);
+
     /* === Icon Colors === */
     --icon-primary: #222;
     --icon-secondary: #142a30;
-    --icon-hover: #344d66;
-    --icon-active: #5eabbe;
+    --icon-hover: #3498db;
+    --icon-active: #2980b9;
+    --icon-color: #222;
+    --icon-color-hover: #3498db;
 
     /* === Button Colors === */
     --button-primary-bg: #3498db;
     --button-primary-bg-hover: #2980b9;
-    --button-primary-text: #ebf5fd;
+    --button-primary-text: #ffffff;
     --button-primary-border: rgba(41, 128, 185, 0.3);
 
     --button-secondary-bg: #ecf0f1;
@@ -34,8 +43,8 @@
     --button-secondary-text: #2c3e50;
     --button-secondary-border: rgba(44, 62, 80, 0.3);
 
-    --button-disabled-bg: #bdc3c7; /*placeholder*/
-    --button-disabled-text: #7f8c8d; /*placeholder*/
+    --button-disabled-bg: #bdc3c7;
+    --button-disabled-text: #7f8c8d;
 
     --button-danger-bg: rgba(192, 57, 43, 0.1);
     --button-danger-bg-hover: rgba(192, 57, 43, 0.2);
@@ -43,45 +52,90 @@
     --button-danger-border: rgba(192, 57, 43, 0.3);
 
     /* === Input Field Colors === */
-    --input-primary-bg: #fff; /*placeholder*/
-    --input-primary-border: #ccc; /*placeholder*/
-    --input-primary-border-focus: #1abc9c; /*placeholder*/
-    --input-primary-text: #2c3e50; /*placeholder*/
+    --input-primary-bg: #ffffff;
+    --input-primary-border: rgba(52, 152, 219, 0.25);
+    --input-primary-border-focus: #3498db;
+    --input-primary-text: #2c3e50;
 
-    --input-secondary-bg: #ecf0f1; /*placeholder*/
-    --input-secondary-border: #bdc3c7; /*placeholder*/
-    --input-secondary-border-focus: #16a085; /*placeholder*/
-    --input-secondary-text: #2c3e50; /*placeholder*/
+    --input-secondary-bg: #ecf0f1;
+    --input-secondary-border: rgba(52, 152, 219, 0.2);
+    --input-secondary-border-focus: #3498db;
+    --input-secondary-text: #2c3e50;
 
-    --input-placeholder-text: #7f8c8d; /*placeholder*/
-    
-    --input-disabled-bg: #bdc3c7; /*placeholder*/
-    --input-disabled-text: #7f8c8d; /*placeholder*/
+    --input-placeholder-text: #95a5a6;
+    --input-disabled-bg: #bdc3c7;
+    --input-disabled-text: #7f8c8d;
 
     /* === Sidebar Settings === */
     --sidebar-extended-width: 140px;
-    --sidebar-collapsed-width: 60px; /* Width when sidebar is collapsed */
-
-    /* === Icon Colors === */
-    --icon-color: #222; /*placeholder*/
-    --icon-color-hover: #34495e; /*placeholder*/
+    --sidebar-collapsed-width: 60px;
 }
 
 body.dark-mode {
-    /* === Dark Mode Colors === */
-    --bg-main: #1a1a1a;
-    --bg-card: #2c2c2c;
-    --text-main: #e2e2e2;
-    --text-secondary: #b0b0b0;
-    --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    /* === Background Colors === */
+    --bg-main: #181818;
+    --bg-card: #222222;
+    --bg-card-hover: #2c2c2c;
+    --bg-card-border: rgba(74, 158, 255, 0.18);
+    --bg-card-border-hover: rgba(74, 158, 255, 0.4);
 
-    /* === Sidebar Settings === */
-    --sidebar-extended-width: 140px; /* Keep the same width for dark mode */
-    --sidebar-collapsed-width: 60px; /* Keep the same width for dark mode */
+    /* === Text Colors === */
+    --text-main: #e8e8e8;
+    --text-secondary: #9aaabb;
+    --text-hover: #9bbce2;
+    --text-active: #4a9eff;
+
+    /* === Shadows - more visible on dark, subtle blue tint === */
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(74, 158, 255, 0.06);
+    --shadow-secondary: 0 2px 10px rgba(0, 0, 0, 0.45);
+
+    /* === Accent & Dividers === */
+    --accent-primary: #4a9eff;
+    --accent-primary-hover: #2d7dd2;
+    --accent-subtle: rgba(74, 158, 255, 0.1);
+    --divider-color: rgba(74, 158, 255, 0.14);
 
     /* === Icon Colors === */
-    --icon-color: #fff; /*placeholder*/
-    --icon-color-hover: #f0f0f0; /*placeholder*/
+    --icon-primary: #c4d0e0;
+    --icon-secondary: #7a8fa8;
+    --icon-hover: #4a9eff;
+    --icon-active: #4a9eff;
+    --icon-color: #e8e8e8;
+    --icon-color-hover: #4a9eff;
+
+    /* === Button Colors === */
+    --button-primary-bg: #4a9eff;
+    --button-primary-bg-hover: #2d7dd2;
+    --button-primary-text: #ffffff;
+    --button-primary-border: rgba(74, 158, 255, 0.45);
+
+    --button-secondary-bg: #2a2a2a;
+    --button-secondary-bg-hover: #333333;
+    --button-secondary-text: #c4d0e0;
+    --button-secondary-border: rgba(74, 158, 255, 0.2);
+
+    --button-disabled-bg: #2e2e2e;
+    --button-disabled-text: #555555;
+
+    --button-danger-bg: rgba(231, 76, 60, 0.1);
+    --button-danger-bg-hover: rgba(231, 76, 60, 0.2);
+    --button-danger-text: #e74c3c;
+    --button-danger-border: rgba(231, 76, 60, 0.35);
+
+    /* === Input Field Colors === */
+    --input-primary-bg: #1c1c1c;
+    --input-primary-border: rgba(74, 158, 255, 0.22);
+    --input-primary-border-focus: #4a9eff;
+    --input-primary-text: #e8e8e8;
+
+    --input-secondary-bg: #222222;
+    --input-secondary-border: rgba(74, 158, 255, 0.18);
+    --input-secondary-border-focus: #4a9eff;
+    --input-secondary-text: #e8e8e8;
+
+    --input-placeholder-text: #4e6070;
+    --input-disabled-bg: #242424;
+    --input-disabled-text: #505050;
 }
 
 body {
@@ -98,7 +152,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 3rem; /* Height of the top bar */
+    height: 3.5rem; /* Height of the top bar */
     background: var(--bg-card);
     box-shadow: var(--shadow);
 

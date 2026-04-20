@@ -14,8 +14,8 @@ login_bp = Blueprint('login_api', __name__, url_prefix='/api/login')
 @login_bp.route('', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    username = data.get('username').strip()
+    password = data.get('password').strip()
     if not username or not password:
         return jsonify({'success': False, 'message': 'Missing credentials'}), 400
     

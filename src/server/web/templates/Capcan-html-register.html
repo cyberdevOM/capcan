@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+    <link rel="stylesheet" href="/static/Capcan-css-register.css">
+    <script src="/static/scripts/bcrypt.js"></script>
+    <script src="/static/scripts/login-register.js"></script>
+</head>
+<body class="register-bg">
+    <div class="register-container">
+        <form class="register-form" id="register-form" novalidate>
+            <div class="glass-panel">
+                <h2 class="register-title">Register</h2>
+                <div class="input-group">
+                    <input type="text" name="username" id="reg-username" placeholder="Username" class="register-input" autofocus required>
+                    <span class="field-error" id="username-error"></span>
+                </div>
+                <div class="input-group">
+                    <input type="email" name="email" id="reg-email" placeholder="Email" class="register-input" required>
+                    <span class="field-error" id="email-error"></span>
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" id="reg-password" placeholder="Password" class="register-input" required>
+                    <span class="field-error" id="password-error"></span>
+                </div>
+                <div class="input-group">
+                    <input type="password" name="confirm_password" id="reg-confirm" placeholder="Confirm Password" class="register-input" required>
+                    <span class="field-error" id="confirm-error"></span>
+                </div>
+                <button type="submit" class="register-btn">Register</button>
+                <div class="register-footer">
+                    <span>Already have an account?</span>
+                    <a href="/login" class="login-link">Sign in</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
