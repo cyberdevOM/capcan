@@ -60,12 +60,15 @@ class Config:
             description TEXT DEFAULT NULL,
             version FLOAT DEFAULT 0,
             client_secret VARCHAR(255) NOT NULL,
+            status STATUS DEFAULT 'active',
             registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen TIMESTAMP DEFAULT NULL,
             revoked BOOLEAN DEFAULT FALSE,
             notes TEXT DEFAULT NULL
         );
         """
-        #? Added "version" Tag to identify in client table the client version
+        # status tracks client connectivity/operational state
+        # last_seen is updated on every telemetry ping, doubling as a heartbeat signal
         cursor.execute(query)
 
     def client_telemetry(self, cursor):
@@ -73,17 +76,15 @@ class Config:
         CREATE TABLE IF NOT EXISTS client_telemetry (
             client_id VARCHAR(255) NOT NULL,
             telemetry_id VARCHAR(255) PRIMARY KEY NOT NULL,
-            status STATUS DEFAULT 'active',
             telemetry JSONB DEFAULT NULL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_call TIMESTAMP DEFAULT (CURRENT_TIMESTAMP - INTERVAL '5 minutes'),
-            next_call TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '5 minutes'),
+            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             tags TEXT[] DEFAULT NULL,
 
             FOREIGN KEY (client_id) REFERENCES registered_clients(client_id) ON DELETE CASCADE ON UPDATE CASCADE
         );
         """
-
+        # No heartbeat scheduling columns — each telemetry submission updates
+        # registered_clients.last_seen, which serves as the heartbeat signal.
         cursor.execute(query)
 
     def client_event(self, cursor):
@@ -154,9 +155,11 @@ class Config:
         query = """
         CREATE TABLE IF NOT EXISTS client_configs (
             client_id VARCHAR(255) NOT NULL,
-            CONFIG_ID VARCHAR(255) PRIMARY KEY NOT NULL,
+            config_id VARCHAR(255) PRIMARY KEY NOT NULL,
             config JSONB DEFAULT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            applied_at TIMESTAMP DEFAULT NULL,
+            config_version INTEGER DEFAULT 1,
 
             FOREIGN KEY (client_id) REFERENCES registered_clients(client_id) ON DELETE CASCADE ON UPDATE CASCADE
         );

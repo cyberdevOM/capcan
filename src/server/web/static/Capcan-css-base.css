@@ -74,7 +74,7 @@
 body.dark-mode {
     /* === Background Colors === */
     --bg-main: #181818;
-    --bg-card: #222222;
+    --bg-card: #2b2b2b;
     --bg-card-hover: #2c2c2c;
     --bg-card-border: rgba(74, 158, 255, 0.18);
     --bg-card-border-hover: rgba(74, 158, 255, 0.4);

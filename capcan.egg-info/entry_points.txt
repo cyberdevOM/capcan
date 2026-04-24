@@ -1,2 +1,3 @@
 [console_scripts]
 capcan.start = src.server.web.__main__:main
+capcan.stop = src.server.web.__main__:stop

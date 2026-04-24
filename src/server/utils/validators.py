@@ -28,7 +28,6 @@ Timestamp Validation:
 import hmac, hashlib, uuid
 import datetime as dt
 from typing import Tuple, Optional
-from src.server.core.database import Database # unused import currently
 from src.server.utils.timestamper import parse_timestamp
 
 MAX_TIMESTAMP_AGE = 300  # 5 minutes

@@ -26,6 +26,8 @@ _db.close()
 @app.route('/')
 @app.route('/dashboard')
 def Dashboard():
+    if not session.get('user_id'):
+        return redirect('/login')
     context = {
         'quickstats_html': dashboard_prerender.render_quickstats(),
         'recent_activity_html': dashboard_prerender.render_recent_activity(),
@@ -33,8 +35,6 @@ def Dashboard():
         'network_status_html': dashboard_prerender.render_network_status(),
         'alerts_html': dashboard_prerender.render_alerts(),
     }
-    if not session.get('user_id'):
-        return redirect('/login')
     return render_template(
         'Capcan-html-home.html',
         **context
@@ -42,13 +42,12 @@ def Dashboard():
 
 @app.route('/clients')
 def Clients():
+    if not session.get('user_id'):
+        return redirect('/login')
     context = {
         'client_list_html': clients_prerender.render_client_list(),
         'client_details_html': clients_prerender.render_client_details(),
     }
-
-    if not session.get('user_id'):
-        return redirect('/login')
     return render_template(
         'Capcan-html-clients.html',
         **context

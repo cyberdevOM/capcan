@@ -8,13 +8,13 @@ capcan.egg-info/requires.txt
 capcan.egg-info/top_level.txt
 src/__init__.py
 src/client_template/client_main.py
-src/client_template/config.json
 src/server/__init__.py
 src/server/app.py
 src/server/api/__init__.py
 src/server/api/alert_endpoints.py
 src/server/api/client_endpoints.py
 src/server/api/login_endpoint.py
+src/server/api/register_endpoint.py
 src/server/api/telemetry_endpoints.py
 src/server/core/__init__.py
 src/server/core/auth.py
@@ -40,8 +40,9 @@ src/server/web/static/Capcan-css-base.css
 src/server/web/static/Capcan-css-clients.css
 src/server/web/static/Capcan-css-home.css
 src/server/web/static/Capcan-css-login.css
+src/server/web/static/Capcan-css-register.css
 src/server/web/static/scripts/bcrypt.js
-src/server/web/static/scripts/login.js
+src/server/web/static/scripts/login-register.js
 src/server/web/static/scripts/scripts.js
 src/server/web/templates/Capcan-html-clients.html
 src/server/web/templates/Capcan-html-home.html

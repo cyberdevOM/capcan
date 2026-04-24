@@ -1,0 +1,7 @@
+interval: 60
+collect:
+  cpu: true
+  memory: true
+  disk: false
+  network: true
+  processes: false

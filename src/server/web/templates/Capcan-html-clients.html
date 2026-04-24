@@ -22,14 +22,113 @@
             </button>
         </div>
         <div class="clients" id="clientsList">
-            <!-- Client items will be dynamically generated here based off a format -->
             {{ client_list_html | safe }}
         </div>
     </section>
     <section class="client-details" id="clientDetails">
-        <!-- Client details will be dynamically generated here based off a format -->
         {{ client_details_html | safe }}
     </section>
-
 </div>
+
+<script>
+// ── Client selection ──────────────────────────────────────────
+function selectClient(clientId) {
+    fetch(`/clients?client_id=${clientId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        .then(r => r.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newDetails = doc.getElementById('clientDetails');
+            if (newDetails) document.getElementById('clientDetails').innerHTML = newDetails.innerHTML;
+        });
+    document.querySelectorAll('.client-item').forEach(el =>
+        el.classList.toggle('active', el.dataset.clientId === clientId));
+}
+
+// ── Multi-select ──────────────────────────────────────────────
+function toggleSelectAll(cb) {
+    document.querySelectorAll('.client-select').forEach(el => { el.checked = cb.checked; });
+    onClientCheckboxChange();
+}
+
+function onClientCheckboxChange() {
+    const selected = getSelectedClientIds();
+    const masterCb = document.getElementById('select-all-clients');
+    const all = document.querySelectorAll('.client-select');
+    if (masterCb) masterCb.indeterminate = selected.length > 0 && selected.length < all.length;
+    document.querySelectorAll('.btn-configure-selected').forEach(btn => {
+        btn.style.opacity = selected.length > 0 ? '1' : '0.5';
+    });
+}
+
+function getSelectedClientIds() {
+    return Array.from(document.querySelectorAll('.client-select:checked')).map(el => el.value);
+}
+
+// ── Config push ───────────────────────────────────────────────
+function _readConfigForm(clientId) {
+    const interval = parseInt(document.getElementById(`cfg-interval-${clientId}`)?.value || '300', 10);
+    const keys = ['cpu', 'memory', 'disk', 'network', 'processes'];
+    const collect = {};
+    keys.forEach(k => {
+        const el = document.getElementById(`cfg-${k}-${clientId}`);
+        collect[k] = el ? el.checked : true;
+    });
+    return { interval, collect };
+}
+
+function pushConfig(clientIds, formSourceId) {
+    const settings = _readConfigForm(formSourceId);
+    const statusEl = document.getElementById(`cfg-status-${formSourceId}`);
+
+    fetch('/api/clients/config', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ client_ids: clientIds, settings })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (statusEl) {
+            statusEl.textContent = data.message || JSON.stringify(data);
+            statusEl.className = 'config-status success';
+            setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'config-status'; }, 4000);
+        }
+    })
+    .catch(err => {
+        if (statusEl) {
+            statusEl.textContent = 'Error: ' + err.message;
+            statusEl.className = 'config-status error';
+        }
+    });
+}
+
+function pushConfigToSelected(formSourceId) {
+    const ids = getSelectedClientIds();
+    if (ids.length === 0) { alert('No clients selected. Use the checkboxes in the list.'); return; }
+    pushConfig(ids, formSourceId);
+}
+
+function openBulkConfig() {
+    const ids = getSelectedClientIds();
+    if (ids.length === 0) { alert('Select at least one client first.'); return; }
+    // If a client detail panel is already open, use its form; otherwise prompt
+    const activeItem = document.querySelector('.client-item.active');
+    if (activeItem) {
+        pushConfigToSelected(activeItem.dataset.clientId);
+    } else {
+        alert(`${ids.length} client(s) selected. Open a client to configure, then click "Apply to all selected".`);
+    }
+}
+
+// ── Search ────────────────────────────────────────────────────
+document.getElementById('clientSearch')?.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.client-item').forEach(el => {
+        const text = el.querySelector('.client-id')?.textContent.toLowerCase() || '';
+        el.style.display = text.includes(q) ? '' : 'none';
+    });
+});
+
+function toggleFilter() {}
+</script>
 {% endblock %}

@@ -98,7 +98,94 @@ def validate_client_request(client_id: str) -> tuple[bool, Dict[str, any], int]:
     return True, {}, 200
 
 
-# ================ API Endpoints ==================
+# ================ Remote Config Push ==================
+
+@client_bp.route('/config', methods=['PUT'])
+def push_client_config():
+    """
+    Push settings to one or more clients. Requires an active admin web session.
+
+    Endpoint: PUT /api/clients/config
+
+    Request Body (JSON):
+    {
+        "client_ids": ["uuid1", "uuid2", ...],
+        "settings": {
+            "interval": 300,
+            "collect": {
+                "cpu": true,
+                "memory": true,
+                "disk": true,
+                "network": true,
+                "processes": true
+            }
+        }
+    }
+
+    Response:
+    {
+        "updated": N,
+        "message": "Settings queued for N client(s)"
+    }
+    """
+    from flask import session as web_session
+
+    if not web_session.get('user_id'):
+        return jsonify({"error": "Authentication required"}), 401
+
+    db = Database()
+    try:
+        user = db.get_web_user_by_id(web_session['user_id']) or {}
+    finally:
+        db.close()
+
+    if user.get('role') != 'admin':
+        return jsonify({"error": "Admin role required"}), 403
+
+    body = request.get_json(silent=True)
+    if not body:
+        return jsonify({"error": "JSON body required"}), 400
+
+    client_ids = body.get("client_ids")
+    settings = body.get("settings")
+
+    if not isinstance(client_ids, list) or not client_ids:
+        return jsonify({"error": "'client_ids' must be a non-empty list"}), 400
+    if not isinstance(settings, dict):
+        return jsonify({"error": "'settings' must be an object"}), 400
+
+    # Validate settings fields
+    allowed_collect_keys = {"cpu", "memory", "disk", "network", "processes"}
+    if "interval" in settings:
+        try:
+            interval = int(settings["interval"])
+            if interval < 10:
+                return jsonify({"error": "'interval' must be >= 10 seconds"}), 400
+            settings["interval"] = interval
+        except (TypeError, ValueError):
+            return jsonify({"error": "'interval' must be an integer"}), 400
+
+    if "collect" in settings:
+        if not isinstance(settings["collect"], dict):
+            return jsonify({"error": "'collect' must be an object"}), 400
+        unknown = set(settings["collect"]) - allowed_collect_keys
+        if unknown:
+            return jsonify({"error": f"Unknown collect keys: {', '.join(unknown)}"}), 400
+        for k, v in settings["collect"].items():
+            if not isinstance(v, bool):
+                return jsonify({"error": f"collect.{k} must be a boolean"}), 400
+
+    # Strip any keys that must not be remotely configurable
+    for forbidden in ("server_url", "client_id", "secret_key"):
+        settings.pop(forbidden, None)
+
+    db = Database()
+    try:
+        updated = db.set_pending_config(client_ids, settings)
+    finally:
+        db.close()
+
+    return jsonify({"updated": updated, "message": f"Settings queued for {updated} client(s)"}), 200
 
 @client_bp.route('/register', methods=['POST'])
 def register_client():

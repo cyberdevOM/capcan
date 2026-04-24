@@ -1,0 +1,4 @@
+server_url: http://localhost:5000
+platform: linux
+client_id: 134dde45-75a2-4652-b603-d1545505a4db
+secret_key: 6937562eebd32e2a714f1e912bf5cf5ddd49bdef00e98089bfa025504702605c

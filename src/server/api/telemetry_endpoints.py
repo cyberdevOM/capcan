@@ -26,8 +26,8 @@ from ..utils.validators import (
     validate_signature,
     extract_security_headers,
     generate_ack_id,
-    get_client_secret
 )
+from ..core.database import Database
 
 # create Flask Blueprint for telemetry endpoints
 telemetry_bp = Blueprint('telemetry', __name__, url_prefix='/api/telemetry')
@@ -49,15 +49,12 @@ MOCK_TELEMETRY = {
     # ]
 }
 
-# Track client existance, in prod this would be a DB query
-MOCK_REGISTERED_CLIENTS = set()
-
 # ================= HELPER FUNCTIONS ================= 
 
 def validate_telemetry_request(client_id: str) -> tuple[bool, Dict[str,any], int]:
     """
-    Validates telemetry summission request.
-    
+    Validates telemetry submission request against the database.
+
     args:
         client_id (str): UUID of the client from request headers.
 
@@ -73,24 +70,28 @@ def validate_telemetry_request(client_id: str) -> tuple[bool, Dict[str,any], int
             "error": "Missing security headers",
             "required": ["X-Client-ID", "X-Timestamp", "X-Signature"]
         }, 401
-    
+
     # validate timestamp is recent
     valid_time, time_error = validate_timestamp(timestamp)
     if not valid_time:
         return False, {"error": f"Invalid timestamp: {time_error}"}, 401
-    
-    # Check client is registered
-    if headers_client_id not in MOCK_REGISTERED_CLIENTS:
-        return False, {
-            "error": "Client not registered",
-            "hint": "Register at POST /api/clients/register first." # possible sec issue if pub
-        }
-    
-    # get client secret key
-    secret_key = get_client_secret(headers_client_id)
-    if not secret_key:
-        return False, {"error": "Client secret not found"}, 401
-    
+
+    # Check client is registered in the database
+    db = Database()
+    try:
+        if not db.get_client_by_id(headers_client_id):
+            return False, {
+                "error": "Client not registered",
+                "hint": "Register at POST /api/clients/register first."
+            }, 401
+
+        # get client secret from database
+        secret_key = db.get_client_secret(headers_client_id)
+        if not secret_key:
+            return False, {"error": "Client secret not found"}, 401
+    finally:
+        db.close()
+
     # validate signature
     valid_sig, sig_error = validate_signature(
         client_id=headers_client_id,
@@ -102,7 +103,7 @@ def validate_telemetry_request(client_id: str) -> tuple[bool, Dict[str,any], int
 
     if not valid_sig:
         return False, {"error": f"Invalid signature: {sig_error}"}, 401
-    
+
     return True, {}, 200
 
 def validate_telemetry_data(data: Dict[str, Any]) -> tuple[bool, str]:
@@ -126,13 +127,7 @@ def validate_telemetry_data(data: Dict[str, Any]) -> tuple[bool, str]:
     }
     """
 
-    # check required fields presence and types
-    required_fields = ['cpu_percent', 'memory_percent', 'disk_usage']
-    for field in required_fields:
-        if field not in data:
-            return False, f"Missing required field: {field}"
-    
-    # validate required percentage fields
+    # check required fields presence and types (only if present — fields may be disabled via remote config)
     percentage_fields = ['cpu_percent', 'memory_percent', 'disk_usage']
     for field in percentage_fields:
         if field in data:
@@ -250,25 +245,44 @@ def submit_telemetry():
         telemetry_entry = {
             "timestamp": current_time,
             "client_id": headers_client_id,
-            **data # spread operator merges data dict into telemetry_entry
+            **data
         }
 
-        # Store telemetry data in mock storage
+        # Persist to database
+        db = Database()
+        try:
+            db.store_client_telemetry(headers_client_id, data)
+            pending_settings = db.deliver_pending_config(headers_client_id)
+            effective = db.get_effective_settings(headers_client_id)
+        finally:
+            db.close()
+
+        # Keep in-memory copy for backwards-compat with GET endpoints
         if headers_client_id not in MOCK_TELEMETRY:
             MOCK_TELEMETRY[headers_client_id] = []
-        
         MOCK_TELEMETRY[headers_client_id].append(telemetry_entry)
 
         # Generate acknowledgement I
         ack_id = generate_ack_id()
 
-        # Return success response
-        return jsonify({
+        # Derive next_report_in from effective settings (fallback to 300)
+        effective_interval = 300
+        if pending_settings and isinstance(pending_settings.get("interval"), (int, float)):
+            effective_interval = int(pending_settings["interval"])
+        elif effective and isinstance(effective.get("interval"), (int, float)):
+            effective_interval = int(effective["interval"])
+
+        response = {
             "status": "received",
             "ack_id": ack_id,
             "received_at": current_time,
-            "next_report_in": 300  # clients should report every 5 minutes
-        }), 201 # Created
+            "next_report_in": effective_interval,
+        }
+        if pending_settings:
+            response["settings"] = pending_settings
+
+        # Return success response
+        return jsonify(response), 201 # Created
     
     except Exception as e:
         return jsonify({"error": f"Failed to process telemetry data: {str(e)}"}), 500
@@ -496,24 +510,4 @@ def get_telemetry_stats(client_id: str):
     except Exception as e:
         return jsonify({"error": f"Failed to calculate telemetry stats: {str(e)}"}), 500
     
-# ================= Register Client (for testing only) =================
-@telemetry_bp.route('/register-client/<client_id>', methods=['POST'])
-def register_client(client_id: str):
-    """
-    Helper endpoint to register a client for testing.
-
-    NOTE: This is a temporary endpoint, in production clients regist trough /api/clients/register
-
-    This endpoint adds the client_id to the MOCK_REGISTERED_CLIENTS set. 
-    so we can test telemetry endpoints without implementing a full client registration flow.
-    
-    DELETE THIS ENDPOINT IN PRODUCTION.
-    """
-
-    MOCK_REGISTERED_CLIENTS.add(client_id)
-    return jsonify({
-        "message": f"Client registered for telemetry (testing only)",
-        "client_id": client_id
-    }), 201
-
 # ================= END OF FILE =================

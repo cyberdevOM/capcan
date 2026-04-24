@@ -1,0 +1,9 @@
+# Remotely configurable settings — these can be updated from the Capcan web UI.
+# Changes pushed from the dashboard take effect on the next telemetry cycle.
+interval: 300
+collect:
+  cpu: true
+  memory: true
+  disk: true
+  network: true
+  processes: true

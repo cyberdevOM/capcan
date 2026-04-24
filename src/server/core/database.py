@@ -380,12 +380,89 @@ class Database:
 
     # ============== TELEMETRY & ALERTS ==============
     def store_client_telemetry(self, client_id: str, telemetry_data: dict):
-        pass  # store incoming telemetry data from clients in the database
+        """Persist a telemetry snapshot to client_telemetry as JSONB. Returns telemetry_id."""
+        import json as _json
+        import uuid as _uuid
+        telemetry_id = str(_uuid.uuid4())
+        query = """
+        INSERT INTO client_telemetry (client_id, telemetry_id, telemetry)
+        VALUES (%s, %s, %s::jsonb)
+        """
+        try:
+            self.cursor.execute(query, (client_id, telemetry_id, _json.dumps(telemetry_data)))
+            self.conn.commit()
+            return telemetry_id
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to store telemetry for client '{client_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return None
 
     def get_client_telemetry(
         self, client_id: str, time_range: dict = None, limit: int = 10
     ):
-        pass  # retrieve telemetry data for a client, optionally filtered by a time range
+        """Retrieve recent telemetry snapshots for a client, newest first."""
+        query = """
+        SELECT telemetry, timestamp FROM client_telemetry
+        WHERE client_id = %s
+        ORDER BY timestamp DESC
+        LIMIT %s
+        """
+        try:
+            self.cursor.execute(query, (client_id, limit))
+            rows = self.cursor.fetchall()
+            return [{"telemetry": row[0], "timestamp": row[1].isoformat()} for row in rows]
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to get telemetry for client '{client_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return []
+
+    def get_latest_client_telemetry(self, client_id: str):
+        """Return the most recent telemetry dict for a client, or None."""
+        query = """
+        SELECT telemetry, timestamp FROM client_telemetry
+        WHERE client_id = %s
+        ORDER BY timestamp DESC
+        LIMIT 1
+        """
+        try:
+            self.cursor.execute(query, (client_id,))
+            row = self.cursor.fetchone()
+            if row:
+                return {"telemetry": row[0], "timestamp": row[1]}
+            return None
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to get latest telemetry for client '{client_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return None
+
+    def get_all_clients_with_status(self):
+        """
+        Return all non-revoked clients with their last telemetry timestamp.
+        Each row: (client_id, hostname, client_os, registered_at, last_seen)
+        where last_seen is a datetime or None.
+        """
+        query = """
+        SELECT rc.client_id, rc.hostname, rc.client_os, rc.registered_at,
+               MAX(ct.timestamp) AS last_seen
+        FROM registered_clients rc
+        LEFT JOIN client_telemetry ct ON rc.client_id = ct.client_id
+        WHERE rc.revoked = false
+        GROUP BY rc.client_id, rc.hostname, rc.client_os, rc.registered_at
+        ORDER BY last_seen DESC NULLS LAST
+        """
+        cols = ["client_id", "hostname", "client_os", "registered_at", "last_seen"]
+        try:
+            self.cursor.execute(query)
+            rows = self.cursor.fetchall()
+            return [dict(zip(cols, row)) for row in rows]
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to get clients with status: {error}")
+            if self.conn:
+                self.conn.rollback()
+            return []
 
     def store_client_event(self, client_id: str, event_type: str, payload: dict):
         pass  # store significant events related to a client (e.g., alerts, errors) in the database
@@ -511,6 +588,85 @@ class Database:
         pass  # update the status of a change record (e.g., pending, approved, rejected) in the database
 
     # ============== CONFIGURATIONs ==================
+    def set_pending_config(self, client_ids: list, settings: dict) -> int:
+        """
+        Push a pending settings update to one or more clients.
+        Inserts a new row into client_configs for each client_id with applied_at=NULL.
+        Returns the number of rows inserted.
+        """
+        import json as _json
+        import uuid as _uuid
+        count = 0
+        for cid in client_ids:
+            config_id = str(_uuid.uuid4())
+            try:
+                self.cursor.execute(
+                    """
+                    INSERT INTO client_configs (client_id, config_id, config, updated_at, applied_at)
+                    VALUES (%s, %s, %s::jsonb, NOW(), NULL)
+                    """,
+                    (cid, config_id, _json.dumps(settings)),
+                )
+                count += 1
+            except (psycopg2.DatabaseError, Exception) as error:
+                print(f"Failed to set pending config for client '{cid}': {error}")
+                if self.conn:
+                    self.conn.rollback()
+                return count
+        self.conn.commit()
+        return count
+
+    def deliver_pending_config(self, client_id: str):
+        """
+        Atomically retrieve the latest pending (unapplied) config for a client
+        and mark it as applied. Returns the settings dict, or None if no pending config.
+        """
+        try:
+            self.cursor.execute(
+                """
+                SELECT config_id, config FROM client_configs
+                WHERE client_id = %s AND applied_at IS NULL
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (client_id,),
+            )
+            row = self.cursor.fetchone()
+            if not row:
+                return None
+            config_id, settings = row
+            self.cursor.execute(
+                "UPDATE client_configs SET applied_at = NOW() WHERE config_id = %s",
+                (config_id,),
+            )
+            self.conn.commit()
+            return settings  # already a dict (psycopg2 auto-decodes JSONB)
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to deliver pending config for client '{client_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return None
+
+    def get_effective_settings(self, client_id: str):
+        """Return the most recently applied settings dict for a client, or None."""
+        try:
+            self.cursor.execute(
+                """
+                SELECT config FROM client_configs
+                WHERE client_id = %s AND applied_at IS NOT NULL
+                ORDER BY applied_at DESC
+                LIMIT 1
+                """,
+                (client_id,),
+            )
+            row = self.cursor.fetchone()
+            return row[0] if row else None
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to get effective settings for client '{client_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return None
+
     def store_configuration(self, client_id, config_id, config_name, config_data):
         pass  # store configuration data in the database
 

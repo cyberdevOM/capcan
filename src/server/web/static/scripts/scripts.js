@@ -311,6 +311,14 @@ function initializeSettingsNav() {
     if (hash && document.getElementById('panel-' + hash)) {
         activatePanel(hash);
     }
+
+    // Activate panel when hash changes (e.g. nav links clicked while already on settings page)
+    window.addEventListener('hashchange', function () {
+        const newHash = window.location.hash.replace('#', '');
+        if (newHash && document.getElementById('panel-' + newHash)) {
+            activatePanel(newHash);
+        }
+    });
 }
 
 function initializePasswordToggles() {
