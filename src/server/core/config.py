@@ -57,6 +57,8 @@ class Config:
             client_number SERIAL UNIQUE NOT NULL,
             hostname VARCHAR(255) NOT NULL,
             client_os VARCHAR(255) DEFAULT NULL,
+            ip_address VARCHAR(255) DEFAULT NULL,
+            ssh_user VARCHAR(255) DEFAULT NULL,
             description TEXT DEFAULT NULL,
             version FLOAT DEFAULT 0,
             client_secret VARCHAR(255) NOT NULL,

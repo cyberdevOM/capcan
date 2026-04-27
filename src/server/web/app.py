@@ -1,4 +1,5 @@
 import os
+import socket
 from flask import Flask, render_template, redirect, session, url_for
 from dotenv import load_dotenv
 
@@ -8,6 +9,7 @@ from .templates.pre_renders import settings_prerender
 
 from ..api import register_api_blueprints
 from ..core.database import Database
+from ..utils.deployer import ensure_bundle
 
 load_dotenv()
 
@@ -22,6 +24,19 @@ register_api_blueprints(app)
 _db = Database()
 _db.create_default_web_user()
 _db.close()
+
+# Build (or refresh) the deployable client bundle.
+# SERVER_IP must be the externally reachable IP/hostname that deployed clients
+# will use to reach this server.  Set it in your .env file.
+_server_ip = os.getenv('SERVER_IP') or socket.gethostbyname(socket.gethostname())
+_server_port = int(os.getenv('FLASK_PORT', 5000))
+if not os.getenv('SERVER_IP'):
+    print(
+        f'[deployer] WARNING: SERVER_IP not set in environment — '
+        f'using detected address {_server_ip!r}. '
+        'Set SERVER_IP in your .env for reliable client deployments.'
+    )
+ensure_bundle(_server_ip, _server_port)
 
 @app.route('/')
 @app.route('/dashboard')

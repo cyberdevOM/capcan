@@ -205,15 +205,17 @@ class Database:
         client_secret: str,
         description: str = None,
         notes: str = None,
+        ip_address: str = None,
+        ssh_user: str = None,
     ):
         query = """
-        INSERT INTO registered_clients (client_id, hostname, client_os, client_secret, description, notes)
-        VALUES (%s, %s, %s, %s, %s, %s);
+        INSERT INTO registered_clients (client_id, hostname, client_os, client_secret, description, notes, ip_address, ssh_user)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
         """
         try:
             self.cursor.execute(
                 query,
-                (client_id, hostname, client_os, client_secret, description, notes),
+                (client_id, hostname, client_os, client_secret, description, notes, ip_address, ssh_user),
             )
             self.conn.commit()
             print(
@@ -368,6 +370,23 @@ class Database:
                 self.conn.rollback()
             return None
 
+    def get_client_deploy_info(self, client_id: str) -> dict | None:
+        """Return the SSH connection details stored for a client."""
+        try:
+            self.cursor.execute(
+                "SELECT ip_address, ssh_user FROM registered_clients WHERE client_id = %s",
+                (client_id,),
+            )
+            row = self.cursor.fetchone()
+            if not row:
+                return None
+            return {'ip_address': row[0], 'ssh_user': row[1]}
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            return None
+
     # ============== CLIENT STATUS & MONITORING ==============
     def update_client_last_seen(self, client_id: str):
         pass  # update the last seen timestamp for a client in the database
@@ -403,9 +422,9 @@ class Database:
     ):
         """Retrieve recent telemetry snapshots for a client, newest first."""
         query = """
-        SELECT telemetry, timestamp FROM client_telemetry
+        SELECT telemetry, received_at FROM client_telemetry
         WHERE client_id = %s
-        ORDER BY timestamp DESC
+        ORDER BY received_at DESC
         LIMIT %s
         """
         try:
@@ -421,9 +440,9 @@ class Database:
     def get_latest_client_telemetry(self, client_id: str):
         """Return the most recent telemetry dict for a client, or None."""
         query = """
-        SELECT telemetry, timestamp FROM client_telemetry
+        SELECT telemetry, received_at FROM client_telemetry
         WHERE client_id = %s
-        ORDER BY timestamp DESC
+        ORDER BY received_at DESC
         LIMIT 1
         """
         try:
@@ -446,7 +465,7 @@ class Database:
         """
         query = """
         SELECT rc.client_id, rc.hostname, rc.client_os, rc.registered_at,
-               MAX(ct.timestamp) AS last_seen
+               MAX(ct.received_at) AS last_seen
         FROM registered_clients rc
         LEFT JOIN client_telemetry ct ON rc.client_id = ct.client_id
         WHERE rc.revoked = false

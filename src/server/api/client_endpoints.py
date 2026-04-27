@@ -263,3 +263,143 @@ def register_client():
     except Exception as e:
         # catch-all for unexpected errors
         return jsonify({"error": f"Registration failed: {str(e)}"}), 500
+
+
+# ================ Admin Web UI Client Management ==================
+
+@client_bp.route('/admin/build-status', methods=['GET'])
+def admin_build_status():
+    """Return the current client bundle build status."""
+    from flask import session as web_session
+    if not web_session.get('user_id'):
+        return jsonify({"error": "Authentication required"}), 401
+    from ..utils.deployer import get_build_status
+    return jsonify(get_build_status()), 200
+
+
+@client_bp.route('/admin/add', methods=['POST'])
+def admin_add_client():
+    """
+    Register and deploy a new client from the web admin UI.
+
+    Endpoint: POST /api/clients/admin/add
+
+    Request Body (JSON):
+    {
+        "username":   "alice",           (SSH user; also used as hostname)
+        "ip_address": "192.168.1.100",
+        "password":   "secret"           (SSH + sudo — never stored)
+    }
+    """
+    from flask import session as web_session
+    from ..utils.deployer import deploy_client
+
+    if not web_session.get('user_id'):
+        return jsonify({"error": "Authentication required"}), 401
+
+    body = request.get_json(silent=True)
+    if not body:
+        return jsonify({"error": "JSON body required"}), 400
+
+    username   = (body.get("username")   or "").strip()
+    ip_address = (body.get("ip_address") or "").strip()
+    password   = body.get("password", "")
+
+    if not username:
+        return jsonify({"error": "'username' is required"}), 400
+    if not ip_address:
+        return jsonify({"error": "'ip_address' is required"}), 400
+    if not password:
+        return jsonify({"error": "'password' is required"}), 400
+
+    client_id  = str(uuid.uuid4())
+    secret_key = generate_secret_key()
+
+    # Register in DB first so the client can authenticate on first contact
+    db = Database()
+    try:
+        db.register_client(
+            client_id, hostname=username, client_os=None,
+            client_secret=secret_key, ip_address=ip_address, ssh_user=username,
+        )
+    except Exception as exc:
+        db.close()
+        return jsonify({"error": f"Failed to register client: {exc}"}), 500
+    finally:
+        db.close()
+
+    # Deploy the bundle to the target machine
+    success, message = deploy_client(ip_address, username, password, client_id, secret_key)
+    if not success:
+        # Roll back the DB record so there is no orphaned entry
+        db = Database()
+        try:
+            db.delete_client(client_id)
+        finally:
+            db.close()
+        return jsonify({"error": message}), 500
+
+    return jsonify({
+        "client_id": client_id,
+        "hostname":  username,
+        "message":   message,
+    }), 201
+
+
+@client_bp.route('/admin/<client_id>', methods=['DELETE'])
+def admin_delete_client(client_id):
+    """
+    Uninstall and remove a client from the web admin UI.
+
+    Endpoint: DELETE /api/clients/admin/<client_id>
+
+    Request Body (JSON):
+    {
+        "password": "secret"    (SSH + sudo password for the target machine)
+    }
+    """
+    from flask import session as web_session
+    from ..utils.deployer import undeploy_client
+
+    if not web_session.get('user_id'):
+        return jsonify({"error": "Authentication required"}), 401
+
+    body     = request.get_json(silent=True) or {}
+    password = body.get("password", "")
+    if not password:
+        return jsonify({"error": "'password' is required"}), 400
+
+    db = Database()
+    try:
+        deploy_info = db.get_client_deploy_info(client_id)
+        if not deploy_info:
+            return jsonify({"error": "Client not found"}), 404
+
+        ip_address = deploy_info.get("ip_address")
+        ssh_user   = deploy_info.get("ssh_user")
+    finally:
+        db.close()
+
+    warnings = []
+
+    # Attempt remote uninstall; warn but continue if it fails (client may be unreachable)
+    if ip_address and ssh_user:
+        success, msg = undeploy_client(ip_address, ssh_user, password)
+        if not success:
+            warnings.append(f"Remote uninstall warning: {msg}")
+    else:
+        warnings.append("No SSH info stored — skipping remote uninstall.")
+
+    # Always remove the DB record
+    db = Database()
+    try:
+        db.delete_client(client_id)
+    except Exception as exc:
+        return jsonify({"error": f"Failed to remove client from database: {exc}"}), 500
+    finally:
+        db.close()
+
+    response = {"message": "Client removed."}
+    if warnings:
+        response["warnings"] = warnings
+    return jsonify(response), 200

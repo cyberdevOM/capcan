@@ -219,70 +219,6 @@ function saveEmail() {
     console.log('saveEmail — not yet implemented');
 }
 
-function selectClient(clientId) {
-    document.querySelectorAll('.client-item').forEach(item => {
-        item.classList.remove('selected');
-    });
-
-    // Add selected class to the clicked client
-    const selectedItem = document.querySelector(`[data-client-id="${clientId}"]`);
-    if (selectedItem) {
-        selectedItem.classList.add('selected');
-    }
-
-    // load client Details - future impl
-}
-
-function connectClient(clientId) {
-    console.log(`Connecting to client ${clientId}`);
-    // Future implementation
-}
-
-function openFileManager(clientId) {
-    console.log(`Opening file manager for client ${clientId}`);
-    // Future implementation
-}
-
-function openTerminal(clientId) {
-    console.log(`Opening terminal for client ${clientId}`);
-    // Future implementation
-}
-
-function showLogs(clientId) {
-    console.log(`Showing logs for client ${clientId}`);
-    // Future implementation
-}
-
-function disconnectClient(clientId) {
-    console.log(`Disconnecting client ${clientId}`);
-    // Future implementation
-}
-
-function toggleFilter() {
-    console.log('Toggling filter options');
-    // Future implementation
-}
-
-function initializeClientSearch() {
-    const clientSearch = document.getElementById('clientSearch');
-    if (clientSearch) {
-        clientSearch.addEventListener('input', function (e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const clientItems = document.querySelectorAll('.client-item');
-
-            clientItems.forEach(item => {
-                const clientId = item.querySelector('.client-id')?.textContent.toLowerCase() || '';
-                const platform = item.querySelector('.client-platform')?.textContent.toLowerCase() || '';
-
-                if (clientId.includes(searchTerm) || platform.includes(searchTerm)) {
-                    item.style.display = 'flex';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-        });
-    }
-}
 
 function initializeSettingsNav() {
     const navItems = document.querySelectorAll('.settings-nav-item');
@@ -341,7 +277,6 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeMasonryLayout(); // Masonry layout for dashboard
     initializeSettings(); // Settings page functionality
     initializeSettingsNav(); // Settings sidebar navigation
-    initializeClientSearch(); // Client search functionality
     initializeDebugGrid(); // Debugging helpers
     initializePasswordToggles(); // Show/hide password buttons
 });

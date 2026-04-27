@@ -76,10 +76,12 @@ SERVICE_NAME="capcan-client"
 
 echo "==> Installing Capcan client to ${INSTALL_DIR}"
 mkdir -p "$INSTALL_DIR"
-cp "$(dirname "$0")/capcan-client" "$INSTALL_DIR/"
-cp "$(dirname "$0")/config.yaml"   "$INSTALL_DIR/"
-cp "$(dirname "$0")/settings.yaml" "$INSTALL_DIR/"
+cp "$(dirname "$0")/capcan-client"          "$INSTALL_DIR/"
+cp "$(dirname "$0")/config.yaml"            "$INSTALL_DIR/"
+cp "$(dirname "$0")/settings.yaml"          "$INSTALL_DIR/"
+cp "$(dirname "$0")/uninstall-service.sh"   "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/capcan-client"
+chmod +x "$INSTALL_DIR/uninstall-service.sh"
 
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<UNIT
 [Unit]

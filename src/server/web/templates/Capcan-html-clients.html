@@ -21,6 +21,14 @@
                 </svg>
             </button>
         </div>
+        <div class="client-action-bar">
+            <button class="client-action-btn add-btn" onclick="openAddClientModal()">
+                <i class="fas fa-plus"></i> Add
+            </button>
+            <button class="client-action-btn delete-btn" id="deleteClientBtn" onclick="openDeleteClientModal()" disabled>
+                <i class="fas fa-trash"></i> Remove
+            </button>
+        </div>
         <div class="clients" id="clientsList">
             {{ client_list_html | safe }}
         </div>
@@ -30,105 +38,64 @@
     </section>
 </div>
 
-<script>
-// ── Client selection ──────────────────────────────────────────
-function selectClient(clientId) {
-    fetch(`/clients?client_id=${clientId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-        .then(r => r.text())
-        .then(html => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newDetails = doc.getElementById('clientDetails');
-            if (newDetails) document.getElementById('clientDetails').innerHTML = newDetails.innerHTML;
-        });
-    document.querySelectorAll('.client-item').forEach(el =>
-        el.classList.toggle('active', el.dataset.clientId === clientId));
-}
+<!-- Add Client Modal -->
+<div class="modal-overlay" id="addClientModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Add Client</h3>
+            <button class="modal-close" onclick="closeAddClientModal()">&#x2715;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-field">
+                <label>Username</label>
+                <input type="text" id="addUsername" placeholder="e.g. admin" autocomplete="off">
+            </div>
+            <div class="modal-field">
+                <label>Client IP</label>
+                <input type="text" id="addIpAddress" placeholder="e.g. 192.168.1.100" autocomplete="off">
+            </div>
+            <div class="modal-field">
+                <label>Password <span class="modal-hint">(SSH login &amp; sudo — not stored)</span></label>
+                <input type="password" id="addPassword" placeholder="SSH password" autocomplete="new-password">
+            </div>
+            <div id="addClientError" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="control-btn secondary" id="addCancelBtn" onclick="closeAddClientModal()">Cancel</button>
+            <button class="control-btn primary" id="addSubmitBtn" onclick="submitAddClient()">
+                <span id="addBtnLabel"><i class="fas fa-plus"></i> Deploy</span>
+                <span id="addBtnSpinner" style="display:none"><i class="fas fa-spinner fa-spin"></i> Deploying…</span>
+            </button>
+        </div>
+    </div>
+</div>
 
-// ── Multi-select ──────────────────────────────────────────────
-function toggleSelectAll(cb) {
-    document.querySelectorAll('.client-select').forEach(el => { el.checked = cb.checked; });
-    onClientCheckboxChange();
-}
+<!-- Delete Client Confirmation Modal -->
+<div class="modal-overlay" id="deleteClientModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Delete Client</h3>
+            <button class="modal-close" onclick="closeDeleteClientModal()">&#x2715;</button>
+        </div>
+        <div class="modal-body">
+            <p id="deleteClientMsg"></p>
+            <div class="modal-field">
+                <label>Password <span class="modal-hint">(SSH &amp; sudo for remote uninstall)</span></label>
+                <input type="password" id="deletePassword" placeholder="SSH password" autocomplete="new-password">
+            </div>
+            <div id="deleteClientError" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="control-btn secondary" id="deleteCancelBtn" onclick="closeDeleteClientModal()">Cancel</button>
+            <button class="control-btn danger" id="deleteSubmitBtn" onclick="confirmDeleteClient()">
+                <span id="deleteBtnLabel"><i class="fas fa-trash"></i> Delete</span>
+                <span id="deleteBtnSpinner" style="display:none"><i class="fas fa-spinner fa-spin"></i> Removing…</span>
+            </button>
+        </div>
+    </div>
+</div>
 
-function onClientCheckboxChange() {
-    const selected = getSelectedClientIds();
-    const masterCb = document.getElementById('select-all-clients');
-    const all = document.querySelectorAll('.client-select');
-    if (masterCb) masterCb.indeterminate = selected.length > 0 && selected.length < all.length;
-    document.querySelectorAll('.btn-configure-selected').forEach(btn => {
-        btn.style.opacity = selected.length > 0 ? '1' : '0.5';
-    });
-}
-
-function getSelectedClientIds() {
-    return Array.from(document.querySelectorAll('.client-select:checked')).map(el => el.value);
-}
-
-// ── Config push ───────────────────────────────────────────────
-function _readConfigForm(clientId) {
-    const interval = parseInt(document.getElementById(`cfg-interval-${clientId}`)?.value || '300', 10);
-    const keys = ['cpu', 'memory', 'disk', 'network', 'processes'];
-    const collect = {};
-    keys.forEach(k => {
-        const el = document.getElementById(`cfg-${k}-${clientId}`);
-        collect[k] = el ? el.checked : true;
-    });
-    return { interval, collect };
-}
-
-function pushConfig(clientIds, formSourceId) {
-    const settings = _readConfigForm(formSourceId);
-    const statusEl = document.getElementById(`cfg-status-${formSourceId}`);
-
-    fetch('/api/clients/config', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ client_ids: clientIds, settings })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (statusEl) {
-            statusEl.textContent = data.message || JSON.stringify(data);
-            statusEl.className = 'config-status success';
-            setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'config-status'; }, 4000);
-        }
-    })
-    .catch(err => {
-        if (statusEl) {
-            statusEl.textContent = 'Error: ' + err.message;
-            statusEl.className = 'config-status error';
-        }
-    });
-}
-
-function pushConfigToSelected(formSourceId) {
-    const ids = getSelectedClientIds();
-    if (ids.length === 0) { alert('No clients selected. Use the checkboxes in the list.'); return; }
-    pushConfig(ids, formSourceId);
-}
-
-function openBulkConfig() {
-    const ids = getSelectedClientIds();
-    if (ids.length === 0) { alert('Select at least one client first.'); return; }
-    // If a client detail panel is already open, use its form; otherwise prompt
-    const activeItem = document.querySelector('.client-item.active');
-    if (activeItem) {
-        pushConfigToSelected(activeItem.dataset.clientId);
-    } else {
-        alert(`${ids.length} client(s) selected. Open a client to configure, then click "Apply to all selected".`);
-    }
-}
-
-// ── Search ────────────────────────────────────────────────────
-document.getElementById('clientSearch')?.addEventListener('input', function() {
-    const q = this.value.toLowerCase();
-    document.querySelectorAll('.client-item').forEach(el => {
-        const text = el.querySelector('.client-id')?.textContent.toLowerCase() || '';
-        el.style.display = text.includes(q) ? '' : 'none';
-    });
-});
-
-function toggleFilter() {}
-</script>
+{% block scripts %}
+<script src="{{ url_for('static', filename='scripts/clients.js') }}"></script>
+{% endblock %}
 {% endblock %}

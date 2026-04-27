@@ -97,10 +97,60 @@
   display: none;
 }
 
+/* --- Client action bar --- */
+.client-action-bar {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--divider-color);
+    flex-shrink: 0;
+}
+
+.client-action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.client-action-btn.add-btn {
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text);
+}
+
+.client-action-btn.add-btn:hover {
+    background: var(--button-primary-bg-hover);
+}
+
+.client-action-btn.delete-btn {
+    background: var(--button-danger-bg);
+    color: var(--button-danger-text);
+    border: 1px solid var(--button-danger-border);
+}
+
+.client-action-btn.delete-btn:hover:not(:disabled) {
+    background: var(--button-danger-bg-hover);
+}
+
+.client-action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* --- Client list styles --- */
 .clients {
     width: 100%;
-    height: calc(100% - 2.5rem);
+    height: calc(100% - 5.5rem);
     overflow-y: auto;
     padding: 0.5rem 0;
 }
@@ -508,3 +558,117 @@
 
 .config-status.success { color: #4ade80; }
 .config-status.error   { color: #f87171; }
+
+/* --- Modals --- */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal {
+    background: var(--bg-main);
+    border: 1px solid var(--divider-color);
+    border-radius: 12px;
+    min-width: 340px;
+    max-width: 460px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--divider-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 1rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.modal-close:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-main);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.modal-body p {
+    margin: 0;
+    color: var(--text-main);
+    line-height: 1.5;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.modal-field label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.modal-hint {
+    font-weight: 400;
+    opacity: 0.75;
+}
+
+.modal-field input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--divider-color);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--text-main);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.modal-field input:focus {
+    border-color: var(--accent-primary);
+}
+
+.modal-error {
+    font-size: 0.82rem;
+    color: #e74c3c;
+    min-height: 1rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--divider-color);
+}
