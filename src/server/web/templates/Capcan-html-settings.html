@@ -34,6 +34,13 @@
                 <span>Users</span>
             </li>
             {% endif %}
+            {% if demo_mode and user_role == 'admin' %}
+            <li class="settings-nav-item settings-nav-item--demo" data-panel="demo">
+                <i class="fas fa-flask settings-nav-icon"></i>
+                <span>Demo</span>
+                <span class="demo-nav-badge">DEMO</span>
+            </li>
+            {% endif %}
         </ul>
     </nav>
 
@@ -142,6 +149,19 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if demo_mode and user_role == 'admin' %}
+        <!-- Demo panel — only visible when server started with --demo and user is admin -->
+        <div class="settings-panel" id="panel-demo">
+            <h2 class="settings-panel-title">
+                Demo
+                <span class="demo-panel-badge">DEMO MODE ACTIVE</span>
+            </h2>
+            <div class="settings-section">
+                {{ demo_settings_html }}
             </div>
         </div>
         {% endif %}

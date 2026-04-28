@@ -90,6 +90,55 @@ def render_configs_settings():
     return Markup(html)
 
 
+def render_demo_settings():
+    """Render the demo mode settings panel."""
+    html = """
+    <div class="settings-section">
+        <h3 class="settings-section-title">Demo Mode</h3>
+        <div class="setting-item">
+            <div class="setting-info">
+                <div class="setting-label">Enable Demo Mode on Clients</div>
+                <div class="setting-description">
+                    Push demo mode to all active clients. When enabled, clients send
+                    synthetic telemetry data instead of real system metrics. Useful for
+                    presentations and UI demonstrations.
+                </div>
+            </div>
+            <div class="setting-control">
+                <label class="switch">
+                    <input type="checkbox" id="demoModeToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        <div class="setting-item">
+            <div class="setting-info">
+                <div class="setting-label">Client Status</div>
+                <div class="setting-description" id="demoStatusText">Loading…</div>
+            </div>
+            <div class="setting-control">
+                <button class="settings-btn settings-btn-secondary" onclick="refreshDemoStatus()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+        <span class="settings-feedback" id="demoFeedback"></span>
+    </div>
+
+    <div class="settings-section">
+        <h3 class="settings-section-title">About Demo Mode</h3>
+        <p class="settings-placeholder-sub" style="padding: 0 0.25rem;">
+            Demo mode replaces live telemetry with realistic synthetic data, allowing
+            you to showcase the dashboard without exposing real infrastructure metrics.
+            Toggling demo mode queues a settings update that each client applies on its
+            next telemetry cycle. Clients that are currently offline will receive the
+            update when they next check in.
+        </p>
+    </div>
+    """
+    return Markup(html)
+
+
 def render_web_settings():
     """Render web/appearance settings."""
     html = """

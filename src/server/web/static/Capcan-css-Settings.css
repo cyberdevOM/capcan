@@ -670,3 +670,43 @@
     border-bottom: 2px solid var(--divider-color);
 }
 
+
+/* ── Demo mode nav item & badges ────────────────── */
+
+.settings-nav-item--demo {
+    color: var(--text-secondary);
+    border-left-color: transparent;
+}
+
+.settings-nav-item--demo.active {
+    border-left-color: #f39c12;
+}
+
+.settings-nav-item--demo:hover {
+    color: var(--text-main);
+}
+
+.demo-nav-badge {
+    margin-left: auto;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    background: #f39c12;
+    color: #fff;
+    border-radius: 3px;
+    padding: 1px 4px;
+    flex-shrink: 0;
+}
+
+.demo-panel-badge {
+    display: inline-block;
+    margin-left: 0.75rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: #f39c12;
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 7px;
+    vertical-align: middle;
+}

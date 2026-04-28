@@ -279,7 +279,71 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeSettingsNav(); // Settings sidebar navigation
     initializeDebugGrid(); // Debugging helpers
     initializePasswordToggles(); // Show/hide password buttons
+    initializeDemoSettings(); // Demo mode toggle (only active when panel exists)
 });
+
+/// === DEMO MODE === ///
+
+function initializeDemoSettings() {
+    const toggle = document.getElementById('demoModeToggle');
+    if (!toggle) return; // demo panel not present
+
+    refreshDemoStatus();
+
+    toggle.addEventListener('change', function () {
+        const enabled = this.checked;
+        const feedback = document.getElementById('demoFeedback');
+        feedback.textContent = 'Saving…';
+        feedback.style.color = 'var(--text-secondary)';
+
+        fetch('/api/demo/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ demo_mode: enabled }),
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    feedback.textContent = data.message;
+                    feedback.style.color = 'var(--success-color, #27ae60)';
+                    refreshDemoStatus();
+                } else {
+                    feedback.textContent = data.error || 'Failed to update demo mode.';
+                    feedback.style.color = 'var(--error-color, #e74c3c)';
+                    toggle.checked = !enabled; // revert
+                }
+                setTimeout(() => { feedback.textContent = ''; }, 4000);
+            })
+            .catch(() => {
+                feedback.textContent = 'Request failed.';
+                feedback.style.color = 'var(--error-color, #e74c3c)';
+                toggle.checked = !enabled;
+                setTimeout(() => { feedback.textContent = ''; }, 4000);
+            });
+    });
+}
+
+function refreshDemoStatus() {
+    const statusText = document.getElementById('demoStatusText');
+    const toggle = document.getElementById('demoModeToggle');
+    if (!statusText || !toggle) return;
+
+    fetch('/api/demo/status')
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                statusText.textContent = 'Unable to load status.';
+                return;
+            }
+            const { total_active_clients, demo_enabled_clients } = data;
+            statusText.textContent =
+                `${demo_enabled_clients} of ${total_active_clients} active client(s) have demo mode enabled.`;
+            toggle.checked = demo_enabled_clients > 0 && demo_enabled_clients === total_active_clients;
+        })
+        .catch(() => {
+            statusText.textContent = 'Unable to load status.';
+        });
+}
 
 /// === DEBUGGING HELPERS === ///
 

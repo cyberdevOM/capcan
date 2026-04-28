@@ -2,7 +2,16 @@ from .app import app
 
 
 def main():
+    import argparse
     import os
+
+    parser = argparse.ArgumentParser(description='Start the Capcan web server.')
+    parser.add_argument('--demo', action='store_true', help='Enable demo mode (adds Demo settings tab)')
+    args = parser.parse_args()
+
+    if args.demo:
+        app.config['DEMO_MODE'] = True
+
     host = os.getenv('FLASK_HOST', '0.0.0.0')
     port = int(os.getenv('FLASK_PORT', 5000))
     debug = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'

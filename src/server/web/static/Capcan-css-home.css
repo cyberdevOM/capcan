@@ -2,7 +2,7 @@
 .dashboard-title {
     font-size: 2rem;
     font-weight: bold;
-    margin: 0.5rem clamp(1rem, 4vw, 3rem); /* Responsive margins (fix laptop overflow)*/
+    margin: 1rem clamp(1rem, 4vw, 3rem); /* Responsive margins (fix laptop overflow)*/
     color: var(--text-main);
 }
 

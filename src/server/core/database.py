@@ -457,6 +457,19 @@ class Database:
                 self.conn.rollback()
             return None
 
+    def get_active_client_ids(self) -> list:
+        """Return a list of client_id strings for all non-revoked clients."""
+        try:
+            self.cursor.execute(
+                "SELECT client_id FROM registered_clients WHERE revoked = false"
+            )
+            return [row[0] for row in self.cursor.fetchall()]
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to get active client IDs: {error}")
+            if self.conn:
+                self.conn.rollback()
+            return []
+
     def get_all_clients_with_status(self):
         """
         Return all non-revoked clients with their last telemetry timestamp.

@@ -1,6 +1,6 @@
 import os
 import socket
-from flask import Flask, render_template, redirect, session, url_for
+from flask import Flask, render_template, redirect, session, url_for, request, jsonify, current_app
 from dotenv import load_dotenv
 
 from .templates.pre_renders import dashboard_prerender
@@ -81,14 +81,18 @@ def Settings():
     finally:
         db.close()
 
+    demo_mode = current_app.config.get('DEMO_MODE', False)
+
     context = {
         'current_user': current_user,
         'user_role': user_role,
         'users_list': users_list,
+        'demo_mode': demo_mode,
         'account_settings_html': settings_prerender.render_account_settings(),
         'client_settings_html': settings_prerender.render_client_settings(),
         'configs_settings_html': settings_prerender.render_configs_settings(),
         'web_settings_html': settings_prerender.render_web_settings(),
+        'demo_settings_html': settings_prerender.render_demo_settings() if demo_mode else '',
     }
     return render_template('Capcan-html-settings.html', **context)
 
@@ -99,6 +103,66 @@ def Login():
 @app.route('/register')
 def Register():
     return render_template('Capcan-html-register.html')
+
+
+@app.route('/api/demo/status')
+def demo_status():
+    """Return current demo mode availability and how many clients have it enabled."""
+    if not session.get('user_id'):
+        return jsonify({'error': 'Unauthorised'}), 401
+
+    db = Database()
+    try:
+        current_user = db.get_web_user_by_id(session['user_id']) or {}
+        if current_user.get('role') != 'admin':
+            return jsonify({'error': 'Admin only'}), 403
+
+        client_ids = db.get_active_client_ids()
+        demo_enabled_count = 0
+        for cid in client_ids:
+            effective = db.get_effective_settings(cid) or {}
+            if effective.get('demo_mode') is True:
+                demo_enabled_count += 1
+    finally:
+        db.close()
+
+    return jsonify({
+        'server_demo_mode': current_app.config.get('DEMO_MODE', False),
+        'total_active_clients': len(client_ids),
+        'demo_enabled_clients': demo_enabled_count,
+    })
+
+
+@app.route('/api/demo/push', methods=['POST'])
+def demo_push():
+    """Push demo_mode on/off to all active clients. Admin only."""
+    if not session.get('user_id'):
+        return jsonify({'error': 'Unauthorised'}), 401
+
+    db = Database()
+    try:
+        current_user = db.get_web_user_by_id(session['user_id']) or {}
+        if current_user.get('role') != 'admin':
+            return jsonify({'error': 'Admin only'}), 403
+
+        body = request.get_json(silent=True) or {}
+        demo_mode_value = bool(body.get('demo_mode', False))
+
+        client_ids = db.get_active_client_ids()
+        if not client_ids:
+            return jsonify({'status': 'ok', 'queued': 0, 'message': 'No active clients found'})
+
+        queued = db.set_pending_config(client_ids, {'demo_mode': demo_mode_value})
+    finally:
+        db.close()
+
+    return jsonify({
+        'status': 'ok',
+        'demo_mode': demo_mode_value,
+        'queued': queued,
+        'message': f'Demo mode {"enabled" if demo_mode_value else "disabled"} queued for {queued} client(s)',
+    })
+
 
 # if __name__ == '__main__':
     # app.run(debug=True)
