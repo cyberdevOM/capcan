@@ -5,3 +5,4 @@ src/server/web/templates/pre_renders/__pycache__
 .env
 note.md
 CODEBASE_REPORTS.md
+**/dist

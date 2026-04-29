@@ -7,6 +7,10 @@ function selectClient(clientId) {
     _activeClientName = document.querySelector(`.client-item[data-client-id="${clientId}"] .client-id`)?.textContent || clientId;
     document.getElementById('deleteClientBtn').disabled = false;
 
+    // Card click = exclusive single select; clear all checkboxes
+    document.querySelectorAll('.client-select').forEach(el => { el.checked = false; });
+    onClientCheckboxChange();
+
     fetch(`/clients?client_id=${clientId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
         .then(r => r.text())
         .then(html => {

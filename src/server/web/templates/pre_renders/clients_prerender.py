@@ -55,24 +55,27 @@ def render_client_list():
         icon = get_platform_icon(c.get("client_os", ""))
         last_seen = _humanize_time(c.get("last_seen"))
         cid = c['client_id']
+        os_label = (c.get('client_os') or 'Unknown').title()
+        ip_label = c.get('ip_address') or ''
+        platform_line = f"{os_label}" + (f" &bull; {ip_label}" if ip_label else "")
         html += f"""
-        <div class="client-item" data-client-id="{cid}">
+        <div class="client-item" data-client-id="{cid}" onclick="selectClient('{cid}')">
             <label class="client-checkbox" onclick="event.stopPropagation()">
                 <input type="checkbox" class="client-select" value="{cid}"
                        onchange="onClientCheckboxChange()">
             </label>
-            <div class="client-status" onclick="selectClient('{cid}')">
+            <div class="client-status">
                 <span class="status-dot {status}"></span>
             </div>
-            <div class="client-icon" onclick="selectClient('{cid}')">
+            <div class="client-icon">
                 <i class="{icon}"></i>
             </div>
-            <div class="client-info" onclick="selectClient('{cid}')">
+            <div class="client-info">
                 <div class="client-id">{c['hostname']}</div>
-                <div class="client-platform">{(c.get('client_os') or 'unknown').title()}</div>
+                <div class="client-platform">{platform_line}</div>
                 <div class="client-last-seen">{last_seen}</div>
             </div>
-            <div class="client-actions" onclick="selectClient('{cid}')">
+            <div class="client-actions">
                 <i class="fas fa-chevron-right"></i>
             </div>
         </div>

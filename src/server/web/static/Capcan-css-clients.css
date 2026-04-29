@@ -163,12 +163,15 @@
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
-    border: 1px solid transparent;
+    background: var(--bg-card);
+    border: 1px solid var(--bg-card-border);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 
 .client-item:hover {
     background: var(--bg-card-hover);
     border-color: var(--bg-card-border-hover);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 .client-item.selected {

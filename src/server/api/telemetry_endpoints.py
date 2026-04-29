@@ -254,6 +254,12 @@ def submit_telemetry():
             db.store_client_telemetry(headers_client_id, data)
             pending_settings = db.deliver_pending_config(headers_client_id)
             effective = db.get_effective_settings(headers_client_id)
+            reported_platform = data.get("platform")
+            reported_hostname = data.get("hostname")
+            if reported_platform and reported_hostname:
+                db.update_client_os_hostname_on_first_contact(
+                    headers_client_id, reported_platform, reported_hostname
+                )
         finally:
             db.close()
 

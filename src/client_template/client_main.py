@@ -395,6 +395,8 @@ def _collect_demo_metrics(settings: dict) -> dict:
         ]
 
     metrics["uptime_seconds"] = int(t % 86400) + 3600
+    metrics["platform"] = detect_platform()
+    metrics["hostname"] = socket.gethostname()
     return metrics
 
 
@@ -447,6 +449,8 @@ def collect_metrics(settings: dict) -> dict:
         metrics["load_average"] = [round(x, 2) for x in la]
 
     metrics["uptime_seconds"] = int(time.time() - psutil.boot_time())
+    metrics["platform"] = detect_platform()
+    metrics["hostname"] = socket.gethostname()
 
     return metrics
 

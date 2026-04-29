@@ -284,6 +284,40 @@ class Database:
             print(f"Failed to update client '{client_id}'.")
             return False
 
+    def update_client_hostname_os(self, client_id: str, hostname: str, client_os: str):
+        """Unconditionally update hostname and client_os for a client."""
+        query = """
+        UPDATE registered_clients SET hostname = %s, client_os = %s WHERE client_id = %s
+        """
+        try:
+            self.cursor.execute(query, (hostname, client_os, client_id))
+            self.conn.commit()
+            return True
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to update hostname/os for '{client_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return False
+
+    def update_client_os_hostname_on_first_contact(
+        self, client_id: str, client_os: str, hostname: str
+    ):
+        """Update client_os and hostname when client_os is NULL (first real check-in)."""
+        query = """
+        UPDATE registered_clients
+        SET client_os = %s, hostname = %s
+        WHERE client_id = %s AND client_os IS NULL
+        """
+        try:
+            self.cursor.execute(query, (client_os, hostname, client_id))
+            self.conn.commit()
+            return True
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to update client os/hostname for '{client_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return False
+
     def delete_client(self, client_id: str):
         query = """
         DELETE FROM registered_clients WHERE client_id = %s
@@ -473,19 +507,19 @@ class Database:
     def get_all_clients_with_status(self):
         """
         Return all non-revoked clients with their last telemetry timestamp.
-        Each row: (client_id, hostname, client_os, registered_at, last_seen)
+        Each row: (client_id, hostname, client_os, registered_at, last_seen, ip_address)
         where last_seen is a datetime or None.
         """
         query = """
         SELECT rc.client_id, rc.hostname, rc.client_os, rc.registered_at,
-               MAX(ct.received_at) AS last_seen
+               MAX(ct.received_at) AS last_seen, rc.ip_address
         FROM registered_clients rc
         LEFT JOIN client_telemetry ct ON rc.client_id = ct.client_id
         WHERE rc.revoked = false
-        GROUP BY rc.client_id, rc.hostname, rc.client_os, rc.registered_at
+        GROUP BY rc.client_id, rc.hostname, rc.client_os, rc.registered_at, rc.ip_address
         ORDER BY last_seen DESC NULLS LAST
         """
-        cols = ["client_id", "hostname", "client_os", "registered_at", "last_seen"]
+        cols = ["client_id", "hostname", "client_os", "registered_at", "last_seen", "ip_address"]
         try:
             self.cursor.execute(query)
             rows = self.cursor.fetchall()

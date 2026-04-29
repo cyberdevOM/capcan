@@ -108,26 +108,30 @@ def deploy_client(
     ssh_password: str,
     client_id: str,
     secret_key: str,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, str | None]:
     """
     SFTP the client bundle to target_ip and install it as a systemd service.
 
     config.yaml is generated in memory with the injected credentials —
     the shared bundle on disk is never modified.
 
-    Returns (success: bool, message: str).
+    Returns (success: bool, message: str, real_hostname: str | None).
     """
     state = _build_status.get('state')
     if state == 'building':
-        return False, 'Client bundle is still building — please wait and try again.'
+        return False, 'Client bundle is still building — please wait and try again.', None
     if state != 'ready':
-        return False, f'Client bundle not ready (state: {state}). Check server logs.'
+        return False, f'Client bundle not ready (state: {state}). Check server logs.', None
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
         ssh.connect(target_ip, username=ssh_user, password=ssh_password, timeout=30)
         sftp = ssh.open_sftp()
+
+        # Grab the machine's real hostname before doing anything else
+        real_hostname_raw, _ = _exec(ssh, 'hostname')
+        real_hostname = real_hostname_raw.strip() or None
 
         _exec(ssh, 'mkdir -p /tmp/capcan-client-bundle')
 
@@ -157,14 +161,14 @@ def deploy_client(
         # Run installer (install-service.sh copies uninstall-service.sh to /opt too)
         _sudo_exec(ssh, 'bash /tmp/capcan-client-bundle/install-service.sh', ssh_password)
 
-        return True, 'Client deployed and service installed successfully.'
+        return True, 'Client deployed and service installed successfully.', real_hostname
 
     except paramiko.AuthenticationException:
-        return False, 'SSH authentication failed — check the username and password.'
+        return False, 'SSH authentication failed — check the username and password.', None
     except (paramiko.SSHException, OSError) as exc:
-        return False, f'SSH/network error: {exc}'
+        return False, f'SSH/network error: {exc}', None
     except Exception as exc:
-        return False, f'Deployment failed: {exc}'
+        return False, f'Deployment failed: {exc}', None
     finally:
         ssh.close()
 

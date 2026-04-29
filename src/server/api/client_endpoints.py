@@ -319,7 +319,7 @@ def admin_add_client():
     db = Database()
     try:
         db.register_client(
-            client_id, hostname=username, client_os=None,
+            client_id, hostname=username, client_os='linux',
             client_secret=secret_key, ip_address=ip_address, ssh_user=username,
         )
     except Exception as exc:
@@ -329,7 +329,7 @@ def admin_add_client():
         db.close()
 
     # Deploy the bundle to the target machine
-    success, message = deploy_client(ip_address, username, password, client_id, secret_key)
+    success, message, real_hostname = deploy_client(ip_address, username, password, client_id, secret_key)
     if not success:
         # Roll back the DB record so there is no orphaned entry
         db = Database()
@@ -339,9 +339,20 @@ def admin_add_client():
             db.close()
         return jsonify({"error": message}), 500
 
+    # Update with the machine's real hostname (fetched via SSH during deploy)
+    if real_hostname and real_hostname != username:
+        db = Database()
+        try:
+            db.update_client_hostname_os(client_id, real_hostname, 'linux')
+        finally:
+            db.close()
+        display_hostname = real_hostname
+    else:
+        display_hostname = username
+
     return jsonify({
         "client_id": client_id,
-        "hostname":  username,
+        "hostname":  display_hostname,
         "message":   message,
     }), 201
 
