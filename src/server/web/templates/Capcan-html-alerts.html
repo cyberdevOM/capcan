@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ url_for('static', filename='Capcan-css-alerts.css') }}">
+{% endblock %}
+
+{% block title %} Alerts - Capcan {% endblock %}
+
+{% block content %}
+<h2>Alerts</h2>
+<div class="alerts-container">
+
+    <!-- Left panel: filter bar + list -->
+    <section class="alert-list-container">
+
+        <!-- Inline search + filter bar -->
+        <div class="alert-filter-bar">
+            <input type="text" id="alertSearch" class="alert-search-input" placeholder="Search alerts…" oninput="filterAlerts()">
+            <select id="alertSeverityFilter" class="alert-filter-select" onchange="filterAlerts()">
+                <option value="">All severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+                <option value="info">Info</option>
+                <option value="undefined">Undefined</option>
+            </select>
+            <select id="alertStatusFilter" class="alert-filter-select" onchange="filterAlerts()">
+                <option value="">All statuses</option>
+                <option value="unresolved">Unresolved</option>
+                <option value="acknowledged">Acknowledged</option>
+                <option value="resolved">Resolved</option>
+            </select>
+        </div>
+
+        <!-- Alert list -->
+        <div class="alert-list" id="alertList">
+            <div class="alert-list-placeholder">Loading alerts…</div>
+        </div>
+
+    </section>
+
+    <!-- Right panel: detail -->
+    <section class="alert-detail-panel" id="alertDetailPanel">
+        <div class="alert-detail-placeholder">
+            <i class="fas fa-bell"></i>
+            <p>Select an alert to view details</p>
+        </div>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => initAlerts('{{ preselected_alert | default("") }}'));
+</script>
+{% endblock %}

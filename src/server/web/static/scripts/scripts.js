@@ -118,6 +118,12 @@ function initializeMasonryLayout() {
         return;
     }
 
+    // Skip if the container uses CSS Grid (dashboard uses CSS Grid now)
+    if (getComputedStyle(grid).display === 'grid') {
+        console.log('TilesGrid uses CSS Grid, skipping Masonry');
+        return;
+    }
+
     // Clear any existing grid sizers
     const existingSizers = grid.querySelectorAll('.grid-sizer');
     existingSizers.forEach(sizer => sizer.remove());
@@ -280,6 +286,9 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeDebugGrid(); // Debugging helpers
     initializePasswordToggles(); // Show/hide password buttons
     initializeDemoSettings(); // Demo mode toggle (only active when panel exists)
+    pollAlertCount();       // Notification badge — runs on every page
+    pollCriticalAlerts();   // Toast banners for critical alerts — runs on every page
+    pollDashboardTiles();   // Live dashboard tile updates (no-op if not on dashboard)
 });
 
 /// === DEMO MODE === ///
@@ -293,13 +302,18 @@ function initializeDemoSettings() {
     toggle.addEventListener('change', function () {
         const enabled = this.checked;
         const feedback = document.getElementById('demoFeedback');
+        const rateInput = document.getElementById('demoAlertRate');
+        const alertRate = rateInput ? parseInt(rateInput.value, 10) : 20;
         feedback.textContent = 'Saving…';
         feedback.style.color = 'var(--text-secondary)';
+
+        const payload = { demo_mode: enabled };
+        if (!isNaN(alertRate) && alertRate > 0) payload.demo_alerts_per_hour = alertRate;
 
         fetch('/api/demo/push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ demo_mode: enabled }),
+            body: JSON.stringify(payload),
         })
             .then(r => r.json())
             .then(data => {
@@ -335,10 +349,20 @@ function refreshDemoStatus() {
                 statusText.textContent = 'Unable to load status.';
                 return;
             }
-            const { total_active_clients, demo_enabled_clients } = data;
-            statusText.textContent =
-                `${demo_enabled_clients} of ${total_active_clients} active client(s) have demo mode enabled.`;
-            toggle.checked = demo_enabled_clients > 0 && demo_enabled_clients === total_active_clients;
+            const { total_active_clients, demo_enabled_clients, demo_pending_clients } = data;
+            const applied = demo_enabled_clients - demo_pending_clients;
+            if (demo_enabled_clients === 0) {
+                statusText.textContent =
+                    `${total_active_clients} active client(s) — demo mode disabled.`;
+            } else if (demo_pending_clients > 0) {
+                statusText.textContent =
+                    `${applied} of ${total_active_clients} client(s) applied, ` +
+                    `${demo_pending_clients} pending next check-in.`;
+            } else {
+                statusText.textContent =
+                    `${demo_enabled_clients} of ${total_active_clients} active client(s) have demo mode enabled.`;
+            }
+            toggle.checked = demo_enabled_clients > 0;
         })
         .catch(() => {
             statusText.textContent = 'Unable to load status.';
@@ -601,4 +625,394 @@ function showBreakpoints() {
     });
     
     button.classList.add('active');
+}
+
+// ========================================================
+// ALERT SYSTEM
+// ========================================================
+
+// ---- State ----
+let _allAlerts = [];
+let _selectedAlertId = null;
+
+// ---- Nav badge polling ----
+let _lastAlertCount = -1; // -1 = not yet known
+
+function pollAlertCount() {
+    function fetchCount() {
+        fetch('/api/web/alerts/count')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) return;
+                const n = data.unresolved > 0 ? data.unresolved : 0;
+
+                // Update nav badge
+                const badge = document.getElementById('alertBadge');
+                if (badge) {
+                    if (n > 0) {
+                        badge.textContent = n > 99 ? '99+' : n;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+
+                // If the count has risen since last check, immediately surface new alerts
+                if (_lastAlertCount >= 0 && n > _lastAlertCount) {
+                    // Trigger toast check and dashboard tile refresh right away
+                    if (typeof _fetchCriticalNow === 'function') _fetchCriticalNow();
+                    if (typeof _refreshDashboardNow === 'function') _refreshDashboardNow();
+                }
+                _lastAlertCount = n;
+            })
+            .catch(() => {});
+    }
+    fetchCount();
+    setInterval(fetchCount, 5000); // 5s heartbeat — lightweight count only
+}
+
+// ---- Alerts page init ----
+function initAlerts(preselectedId) {
+    const list = document.getElementById('alertList');
+    if (!list) return; // not on alerts page
+    loadAlerts().then(() => {
+        if (preselectedId) selectAlert(preselectedId);
+    });
+}
+
+function loadAlerts() {
+    return fetch('/api/web/alerts?limit=500')
+        .then(r => r.ok ? r.json() : { alerts: [] })
+        .then(data => {
+            _allAlerts = data.alerts || [];
+            filterAlerts(); // apply current filter state to fresh data
+        })
+        .catch(() => {
+            _allAlerts = [];
+            renderAlertList([]);
+        });
+}
+
+function filterAlerts() {
+    const q        = (document.getElementById('alertSearch')?.value || '').toLowerCase();
+    const severity = document.getElementById('alertSeverityFilter')?.value || '';
+    const status   = document.getElementById('alertStatusFilter')?.value || '';
+
+    const filtered = _allAlerts.filter(a => {
+        if (severity && a.severity !== severity) return false;
+        if (status   && a.status   !== status)   return false;
+        if (q) {
+            const haystack = [a.event_type, a.hostname, a.client_id, a.severity, a.status]
+                .filter(Boolean).join(' ').toLowerCase();
+            if (!haystack.includes(q)) return false;
+        }
+        return true;
+    });
+    renderAlertList(filtered);
+}
+
+function renderAlertList(alerts) {
+    const list = document.getElementById('alertList');
+    if (!list) return;
+
+    if (!alerts.length) {
+        list.innerHTML = '<div class="alert-list-placeholder">No alerts found.</div>';
+        return;
+    }
+
+    list.innerHTML = alerts.map(a => `
+        <div class="alert-item sev-${a.severity || 'undefined'}${a.alert_id === _selectedAlertId ? ' selected' : ''}"
+             id="alert-item-${a.alert_id}"
+             onclick="selectAlert('${a.alert_id}')">
+            <div class="alert-item-header">
+                <span class="alert-item-title">${escapeHtml(a.event_type || 'Unknown event')}</span>
+                <span class="severity-badge severity-${a.severity || 'undefined'}">${a.severity || '?'}</span>
+            </div>
+            <div class="alert-item-meta">
+                <span>${escapeHtml(a.hostname || a.client_id || '—')}</span>
+                <span>·</span>
+                <span class="status-badge status-${a.status || 'unresolved'}">${a.status || 'unresolved'}</span>
+                <span>·</span>
+                <span>${relativeTime(a.created_at)}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function selectAlert(alertId) {
+    _selectedAlertId = alertId;
+    document.querySelectorAll('.alert-item').forEach(el => {
+        el.classList.toggle('selected', el.id === 'alert-item-' + alertId);
+    });
+
+    const alert = _allAlerts.find(a => a.alert_id === alertId);
+    if (!alert) return;
+
+    const panel = document.getElementById('alertDetailPanel');
+    if (!panel) return;
+
+    let detailsHtml = '';
+    if (alert.details) {
+        let parsed;
+        try { parsed = typeof alert.details === 'string' ? JSON.parse(alert.details) : alert.details; }
+        catch(e) { parsed = alert.details; }
+        detailsHtml = `
+            <div class="alert-details-section">
+                <h4>Details</h4>
+                <pre class="alert-details-pre">${escapeHtml(JSON.stringify(parsed, null, 2))}</pre>
+            </div>`;
+    }
+
+    const canAck  = alert.status === 'unresolved';
+    const canRes  = alert.status === 'acknowledged'; // must acknowledge first
+
+    panel.innerHTML = `
+        <div class="alert-detail-header">
+            <div class="alert-detail-header-main">
+                <i class="fas fa-bell"></i>
+                <div>
+                    <h2 class="alert-detail-title">${escapeHtml(alert.event_type || 'Unknown event')}</h2>
+                    <div class="alert-detail-badges">
+                        <span class="severity-badge severity-${alert.severity || 'undefined'}">${alert.severity || 'undefined'}</span>
+                        <span class="status-badge status-${alert.status || 'unresolved'}">${alert.status || 'unresolved'}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="alert-detail-actions">
+                <button class="alert-btn alert-btn-ack" ${canAck ? '' : 'disabled'}
+                        onclick="acknowledgeAlert('${alert.alert_id}')">
+                    <i class="fas fa-check-circle"></i> Acknowledge
+                </button>
+                <button class="alert-btn alert-btn-resolve" ${canRes ? '' : 'disabled'}
+                        onclick="resolveAlert('${alert.alert_id}')">
+                    <i class="fas fa-check-double"></i> Resolve
+                </button>
+            </div>
+        </div>
+        <div class="alert-info-grid">
+            <div class="alert-info-card">
+                <div class="alert-info-label">Alert ID</div>
+                <div class="alert-info-value" style="font-size:0.78rem">${escapeHtml(alert.alert_id)}</div>
+            </div>
+            <div class="alert-info-card">
+                <div class="alert-info-label">Client</div>
+                <div class="alert-info-value">${escapeHtml(alert.hostname || alert.client_id || '—')}</div>
+            </div>
+            <div class="alert-info-card">
+                <div class="alert-info-label">Score</div>
+                <div class="alert-info-value">${alert.score != null ? alert.score : '—'}</div>
+            </div>
+            <div class="alert-info-card">
+                <div class="alert-info-label">Rule ID</div>
+                <div class="alert-info-value">${escapeHtml(alert.rule_id || '—')}</div>
+            </div>
+            <div class="alert-info-card">
+                <div class="alert-info-label">Created</div>
+                <div class="alert-info-value">${alert.created_at ? new Date(alert.created_at).toLocaleString() : '—'}</div>
+            </div>
+            <div class="alert-info-card">
+                <div class="alert-info-label">Acknowledged by</div>
+                <div class="alert-info-value">${alert.acknowledged_by ? escapeHtml(alert.acknowledged_by) : '—'}</div>
+            </div>
+            ${alert.tags && alert.tags.length ? `
+            <div class="alert-info-card">
+                <div class="alert-info-label">Tags</div>
+                <div class="alert-info-value">${(Array.isArray(alert.tags) ? alert.tags : [alert.tags]).map(t => escapeHtml(t)).join(', ')}</div>
+            </div>` : ''}
+        </div>
+        ${detailsHtml}`;
+}
+
+function acknowledgeAlert(alertId) {
+    fetch(`/api/web/alerts/${alertId}/acknowledge`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert('Error: ' + data.error); return; }
+            loadAlerts().then(() => selectAlert(alertId));
+            pollAlertCount();
+        })
+        .catch(e => alert('Request failed: ' + e));
+}
+
+function resolveAlert(alertId) {
+    fetch(`/api/web/alerts/${alertId}/resolve`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert('Error: ' + data.error); return; }
+            loadAlerts().then(() => selectAlert(alertId));
+            pollAlertCount();
+        })
+        .catch(e => alert('Request failed: ' + e));
+}
+
+// ---- Helpers ----
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function relativeTime(isoStr) {
+    if (!isoStr) return '—';
+    const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
+    if (diff < 60)   return diff + 's ago';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400)return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+}
+
+// ── Critical Alert Toast Banners ────────────────────────────────────────────
+
+// In-memory only — no sessionStorage, so new alerts always surface during a session.
+const _toastSeen = new Set();
+// True until the first fetch completes; used to age-gate startup toasts.
+let _toastFirstFetch = true;
+
+function _toastSevClass(sev) {
+    const map = { critical:'', high:'toast-high', medium:'toast-medium',
+                  low:'toast-low', info:'toast-info' };
+    return map[sev] || '';
+}
+
+function showAlertToast(alert) {
+    const container = document.getElementById('alertToastContainer');
+    if (!container) return;
+
+    const sev      = (alert.severity || 'critical').toLowerCase();
+    const sevClass = _toastSevClass(sev);
+    const event    = escapeHtml(alert.event_type || 'Unknown event');
+    const host     = escapeHtml(alert.hostname || alert.client_id || '?');
+    const id       = alert.alert_id;
+    const status   = alert.status || 'unresolved';
+
+    const toast = document.createElement('div');
+    toast.className = `alert-toast ${sevClass}`;
+    toast.dataset.alertId = id;
+
+    const canAck = status === 'unresolved';
+    const canRes = status === 'acknowledged';
+
+    toast.innerHTML = `
+        <div class="alert-toast-header">
+            <span class="alert-toast-sev">${escapeHtml(sev)}</span>
+            <button class="alert-toast-close" title="Dismiss"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="alert-toast-event">${event}</div>
+        <div class="alert-toast-host">${host}</div>
+        <div class="alert-toast-actions">
+            ${canAck ? `<button class="alert-toast-btn alert-toast-btn-ack" data-id="${id}"><i class="fas fa-check-circle"></i> Ack</button>` : ''}
+            ${canRes ? `<button class="alert-toast-btn alert-toast-btn-resolve" data-id="${id}"><i class="fas fa-check-double"></i> Resolve</button>` : ''}
+        </div>
+        <div class="alert-toast-progress"></div>
+    `;
+
+    toast.querySelector('.alert-toast-close').addEventListener('click', () => {
+        _dismissToast(toast);
+    });
+
+    const ackBtn = toast.querySelector('.alert-toast-btn-ack');
+    if (ackBtn) ackBtn.addEventListener('click', () => {
+        fetch(`/api/web/alerts/${id}/acknowledge`, { method: 'POST' })
+            .then(r => r.ok ? r.json() : null)
+            .then(() => _dismissToast(toast))
+            .catch(() => {});
+    });
+
+    const resBtn = toast.querySelector('.alert-toast-btn-resolve');
+    if (resBtn) resBtn.addEventListener('click', () => {
+        fetch(`/api/web/alerts/${id}/resolve`, { method: 'POST' })
+            .then(r => r.ok ? r.json() : null)
+            .then(() => _dismissToast(toast))
+            .catch(() => {});
+    });
+
+    container.appendChild(toast);
+
+    const timer = setTimeout(() => _dismissToast(toast), 10000);
+    toast._dismissTimer = timer;
+}
+
+function _dismissToast(toast) {
+    clearTimeout(toast._dismissTimer);
+    toast.style.transition = 'opacity 0.3s, transform 0.3s';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(60px)';
+    setTimeout(() => toast.remove(), 320);
+}
+
+function pollCriticalAlerts() {
+    function fetchCritical() {
+        fetch('/api/web/alerts?severity=critical&status=unresolved&limit=20')
+            .then(r => r.ok ? r.json() : { alerts: [] })
+            .then(data => {
+                const now = Date.now();
+                const isFirst = _toastFirstFetch;
+                _toastFirstFetch = false;
+
+                (data.alerts || []).forEach(a => {
+                    const id = a.alert_id;
+                    if (_toastSeen.has(id)) return;
+
+                    // On the very first fetch, only surface alerts created in the last 5 min
+                    // to avoid spamming toasts for a backlog of old alerts on page load.
+                    if (isFirst && a.created_at) {
+                        const ageSec = (now - new Date(a.created_at).getTime()) / 1000;
+                        if (ageSec > 300) {
+                            _toastSeen.add(id); // silently mark seen
+                            return;
+                        }
+                    }
+
+                    _toastSeen.add(id);
+                    showAlertToast(a);
+                });
+            })
+            .catch(() => {});
+    }
+    // Expose so pollAlertCount can trigger an immediate check on count rise
+    window._fetchCriticalNow = fetchCritical;
+    fetchCritical();
+    setInterval(fetchCritical, 15000); // poll every 15s as a fallback
+}
+
+
+// ── Live Dashboard Tile Polling ──────────────────────────────────────────────
+
+function pollDashboardTiles() {
+    const grid = document.getElementById('TilesGrid');
+    if (!grid) return; // not on the dashboard page
+
+    // Map tile API key → element ID (title with spaces replaced by hyphens)
+    const TILE_MAP = {
+        quickstats:      'Quick-Stats',
+        recent_activity: 'Recent-Activity',
+        system_health:   'System-Health',
+        network_status:  'Network-Status',
+        alerts:          'Alerts',
+    };
+
+    function updateTiles() {
+        fetch('/api/web/dashboard/tiles')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) return;
+                Object.entries(TILE_MAP).forEach(([key, elId]) => {
+                    const tile = document.getElementById(elId);
+                    if (!tile || !data[key]) return;
+                    const content = tile.querySelector('.modular-block-content');
+                    if (content) content.innerHTML = data[key];
+                });
+            })
+            .catch(() => {});
+    }
+
+    // Expose so pollAlertCount can trigger an immediate refresh on count rise
+    window._refreshDashboardNow = updateTiles;
+
+    // First update after a short delay (let the page settle), then every 30s
+    setTimeout(updateTiles, 5000);
+    setInterval(updateTiles, 30000);
 }

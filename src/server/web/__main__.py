@@ -1,4 +1,5 @@
 from .app import app
+from ..utils.deployer import write_bundle_settings
 
 
 def main():
@@ -11,6 +12,7 @@ def main():
 
     if args.demo:
         app.config['DEMO_MODE'] = True
+        write_bundle_settings(demo_mode=True)
 
     host = os.getenv('FLASK_HOST', '0.0.0.0')
     port = int(os.getenv('FLASK_PORT', 5000))

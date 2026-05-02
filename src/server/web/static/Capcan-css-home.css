@@ -6,19 +6,56 @@
     color: var(--text-main);
 }
 
-.grid-sizer {
-    width: 20%; /* Base size for Masonry grid items */
-}
 
 .dashboard-tiles {
-    /* using Masonry.js for layout */
-    margin: 0;
+    /* CSS Grid replaces Masonry float layout for reliable full-width filling */
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    align-items: start;
+    padding: 0 clamp(0.5rem, 2vw, 1.5rem) 1.5rem;
     position: relative;
 }
 
 .modular-block {
     float: left;
     margin-bottom: 16px;
+}
+
+/* ── CSS Grid overrides for the dashboard TilesGrid ──────────────────────── */
+/* These replace the float+width approach with proper grid spanning.          */
+#TilesGrid .modular-block {
+    float: none;
+    width: 100%;    /* fill the grid cell, gap handles spacing */
+    margin-bottom: 0;
+}
+#TilesGrid .modular-block-xl     { grid-column: span 5; }
+#TilesGrid .modular-block-large  { grid-column: span 4; }
+#TilesGrid .modular-block-medium { grid-column: span 3; }
+#TilesGrid .modular-block-small  { grid-column: span 2; }
+#TilesGrid .modular-block-xs     { grid-column: span 1; }
+
+/* Responsive: collapse to 2-column on narrow screens */
+@media (max-width: 900px) {
+    .dashboard-tiles {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    #TilesGrid .modular-block-xl,
+    #TilesGrid .modular-block-large,
+    #TilesGrid .modular-block-medium { grid-column: span 2; }
+    #TilesGrid .modular-block-small  { grid-column: span 1; }
+    #TilesGrid .modular-block-xs     { grid-column: span 1; }
+}
+
+@media (max-width: 600px) {
+    .dashboard-tiles {
+        grid-template-columns: 1fr;
+    }
+    #TilesGrid .modular-block-xl,
+    #TilesGrid .modular-block-large,
+    #TilesGrid .modular-block-medium,
+    #TilesGrid .modular-block-small,
+    #TilesGrid .modular-block-xs { grid-column: span 1; }
 }
 
 /* --- Dashboard Modular Block Content --- */
@@ -190,15 +227,27 @@
     border-left: 4px solid;
 }
 
-.alert-warning {
-    border-color: #f39c12; /* Yellow */
-    background: rgba(243, 156, 18, 0.1);
-}
+.alert-warning  { border-color: #f39c12; background: rgba(243,156,18,0.1); }
+.alert-critical { border-color: #c0392b; background: rgba(192,57,43,0.1); }
+.alert-high     { border-color: #e67e22; background: rgba(230,126,34,0.1); }
+.alert-medium   { border-color: #c49a0a; background: rgba(196,154,10,0.1); }
+.alert-low      { border-color: #2980b9; background: rgba(41,128,185,0.1); }
+.alert-info     { border-color: #27ae60; background: rgba(39,174,96,0.1); }
+.alert-undefined{ border-color: #7f8c8d; background: rgba(127,140,141,0.1); }
 
-.alert-info {
-    border-color: #3498db; /* Blue */
-    background: rgba(52, 152, 219, 0.1);
+a.dash-alert-link {
+    display: flex;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: opacity 0.15s;
 }
+a.dash-alert-link:hover { opacity: 0.8; }
+
+.dash-alert-status { font-weight: 600; }
+.dash-status-unresolved  { color: #c0392b; }
+.dash-status-acknowledged { color: #e67e22; }
+.dash-status-resolved    { color: #27ae60; }
 
 .alert-item i {
     margin-top: 0.1rem;

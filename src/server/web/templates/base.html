@@ -47,6 +47,12 @@
                             <a href="{{ url_for('Clients') }}" class="option-link">Clients</a>
                         </li>
                         <li class="option-item">
+                            <a href="{{ url_for('Alerts') }}" class="option-link">
+                                Alerts
+                            </a>
+                            <span id="alertBadge" class="alert-badge"></span>
+                        </li>
+                        <li class="option-item">
                             <a href="{{ url_for('Settings') }}#configs" class="option-link">Config</a>
                         </li>
                     </ul>
@@ -103,6 +109,9 @@
                     <a href="{{ url_for('Clients') }}" class="mobile-icon-link">
                         <i class="fas fa-users"></i>
                     </a>
+                    <a href="{{ url_for('Alerts') }}" class="mobile-icon-link" title="Alerts">
+                        <i class="fas fa-bell"></i>
+                    </a>
                     <a href="{{ url_for('Settings') }}" class="mobile-icon-link">
                         <i class="fas fa-folder"></i>
                     </a>
@@ -118,6 +127,8 @@
         <div class="main-content">
             {% block content %}{% endblock %}
         </div>
+        <!-- Critical alert toast container (all pages) -->
+        <div id="alertToastContainer" aria-live="polite"></div>
         {% block scripts %}{% endblock %}
     </body>
 </html>

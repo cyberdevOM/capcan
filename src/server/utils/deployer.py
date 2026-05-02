@@ -26,6 +26,44 @@ BUILD_SCRIPT = os.path.join(REPO_ROOT, 'scripts', 'build_client.sh')
 _build_lock = threading.Lock()
 _build_status: dict = {'state': 'idle', 'message': 'Not yet started'}
 
+# Persisted across build threads so settings.yaml is written correctly after a build.
+_bundle_demo_mode: bool = False
+_bundle_demo_alerts_per_hour: int = 20
+
+
+def write_bundle_settings(demo_mode: bool = False, demo_alerts_per_hour: int = 20) -> None:
+    """
+    Write settings.yaml into the bundle directory.
+
+    Called at startup (after --demo flag is parsed) and after a successful
+    background build so every copy of the bundle has consistent defaults.
+    The deployer uploads all files in BUNDLE_DIR, so this file is included
+    automatically whenever a client is deployed.
+    """
+    global _bundle_demo_mode, _bundle_demo_alerts_per_hour
+    _bundle_demo_mode = demo_mode
+    _bundle_demo_alerts_per_hour = demo_alerts_per_hour
+
+    os.makedirs(BUNDLE_DIR, exist_ok=True)
+    settings = {
+        'demo_mode': demo_mode,
+        'demo_alerts_per_hour': demo_alerts_per_hour,
+        'interval': 300,
+        'collect': {
+            'cpu': True,
+            'memory': True,
+            'disk': True,
+            'network': True,
+            'processes': True,
+        },
+    }
+    with open(os.path.join(BUNDLE_DIR, 'settings.yaml'), 'w') as fh:
+        yaml.dump(settings, fh, default_flow_style=False, sort_keys=False)
+    print(
+        f'[deployer] settings.yaml written '
+        f'(demo_mode={demo_mode}, demo_alerts_per_hour={demo_alerts_per_hour})'
+    )
+
 
 def get_build_status() -> dict:
     return _build_status.copy()
@@ -44,6 +82,8 @@ def _do_build(server_ip: str, server_port: int) -> None:
             )
             if result.returncode == 0:
                 _build_status = {'state': 'ready', 'message': 'Bundle ready'}
+                _refresh_base_config(server_ip, server_port)
+                write_bundle_settings(_bundle_demo_mode, _bundle_demo_alerts_per_hour)
             else:
                 _build_status = {
                     'state': 'error',

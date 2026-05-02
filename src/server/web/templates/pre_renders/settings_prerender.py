@@ -113,6 +113,19 @@ def render_demo_settings():
         </div>
         <div class="setting-item">
             <div class="setting-info">
+                <div class="setting-label">Demo Alert Rate</div>
+                <div class="setting-description">
+                    Number of synthetic alerts submitted per hour while demo mode is active.
+                </div>
+            </div>
+            <div class="setting-control">
+                <input type="number" id="demoAlertRate" class="settings-number-input"
+                       min="1" max="120" value="20">
+                <span class="setting-description">/ hr</span>
+            </div>
+        </div>
+        <div class="setting-item">
+            <div class="setting-info">
                 <div class="setting-label">Client Status</div>
                 <div class="setting-description" id="demoStatusText">Loading…</div>
             </div>

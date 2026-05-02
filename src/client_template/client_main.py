@@ -56,6 +56,7 @@ log = logging.getLogger("capcan-client")
 DEFAULT_SETTINGS = {
     "interval": 300,
     "demo_mode": False,
+    "demo_alerts_per_hour": 20,
     "collect": {
         "cpu": True,
         "memory": True,
@@ -90,6 +91,8 @@ def load_settings() -> dict:
             merged["interval"] = int(on_disk["interval"])
         if isinstance(on_disk.get("demo_mode"), bool):
             merged["demo_mode"] = on_disk["demo_mode"]
+        if isinstance(on_disk.get("demo_alerts_per_hour"), (int, float)):
+            merged["demo_alerts_per_hour"] = int(on_disk["demo_alerts_per_hour"])
         if isinstance(on_disk.get("collect"), dict):
             for k in merged["collect"]:
                 if isinstance(on_disk["collect"].get(k), bool):
@@ -123,6 +126,12 @@ def apply_remote_settings(current: dict, incoming: dict) -> tuple[dict, bool]:
     if "demo_mode" in incoming and isinstance(incoming["demo_mode"], bool):
         if incoming["demo_mode"] != updated.get("demo_mode"):
             updated["demo_mode"] = incoming["demo_mode"]
+            changed = True
+
+    if "demo_alerts_per_hour" in incoming and isinstance(incoming["demo_alerts_per_hour"], (int, float)):
+        new_rate = int(incoming["demo_alerts_per_hour"])
+        if new_rate != updated.get("demo_alerts_per_hour"):
+            updated["demo_alerts_per_hour"] = new_rate
             changed = True
 
     if "collect" in incoming and isinstance(incoming["collect"], dict):
@@ -207,10 +216,10 @@ _prev_net_io: Optional[object] = None
 psutil.cpu_percent(interval=None)
 
 # Per-process random offset so demo outlier timing differs between client instances.
-_DEMO_SEED_OFFSET: int = random.randint(0, 0xFFFF)
+DEMO_SEED_OFFSET: int = random.randint(0, 0xFFFF)
 
 # Alert scenarios for demo mode — covers all 4 severities and a spread of event types.
-_DEMO_ALERT_SCENARIOS = [
+DEMO_ALERT_SCENARIOS = [
     {
         "severity": "critical",
         "event_type": "file_modified",
@@ -269,7 +278,7 @@ _DEMO_ALERT_SCENARIOS = [
         },
     },
     {
-        "severity": "warning",
+        "severity": "medium",
         "event_type": "process_terminated",
         "details": {
             "process_name": "auditd",
@@ -278,7 +287,7 @@ _DEMO_ALERT_SCENARIOS = [
         },
     },
     {
-        "severity": "warning",
+        "severity": "medium",
         "event_type": "file_deleted",
         "details": {
             "file_path": "/var/log/auth.log",
@@ -288,7 +297,7 @@ _DEMO_ALERT_SCENARIOS = [
         },
     },
     {
-        "severity": "warning",
+        "severity": "medium",
         "event_type": "custom",
         "details": {
             "description": "CPU saturation sustained for 2+ minutes — possible load-based attack",
@@ -318,24 +327,24 @@ _DEMO_ALERT_SCENARIOS = [
 ]
 
 # Target alert submission rate in demo mode.
-_DEMO_ALERTS_PER_HOUR = 4
+DEMO_ALERTS_PER_HOUR = 20
 
 
-def _collect_demo_metrics(settings: dict) -> dict:
+def collect_demo_metrics(settings: dict) -> dict:
     """
     Generate synthetic telemetry for demo mode.
 
     Normal values follow a slow sine wave. Approximately 15% of 30-second
     windows include a single-metric spike that reaches alert-worthy levels.
     The spike type is stable within the window (same bucket seed) but varies
-    across windows and differs between client processes (_DEMO_SEED_OFFSET).
+    across windows and differs between client processes (DEMO_SEED_OFFSET).
     """
     collect = settings.get("collect", DEFAULT_SETTINGS["collect"])
     t = time.time()
     wave = math.sin(t / 60) * 0.5 + 0.5  # 0–1, slow oscillation
 
     # Decide spike type for this 30-second window.
-    bucket_rng = random.Random(int(t // 30) ^ _DEMO_SEED_OFFSET)
+    bucket_rng = random.Random(int(t // 30) ^ DEMO_SEED_OFFSET)
     enabled = [k for k, v in collect.items() if v]
     spike_pool = enabled + ["load_average"]  # load_average always present
     outlier = bucket_rng.choice(spike_pool) if bucket_rng.random() < 0.15 else None
@@ -404,7 +413,7 @@ def collect_metrics(settings: dict) -> dict:
     """Collect a telemetry snapshot, respecting enabled/disabled collect flags."""
     if settings.get("demo_mode"):
         log.debug("Demo mode active — sending synthetic telemetry")
-        return _collect_demo_metrics(settings)
+        return collect_demo_metrics(settings)
 
     global _prev_disk_io, _prev_net_io
 
@@ -487,16 +496,17 @@ def send_alert(config: dict, alert_data: dict) -> dict:
     return resp.json()
 
 
-def _maybe_send_demo_alert(config: dict, interval: int) -> None:
+def _maybe_send_demo_alert(config: dict, settings: dict, interval: int) -> None:
     """
-    Randomly submit a demo alert, targeting _DEMO_ALERTS_PER_HOUR over time.
+    Randomly submit a demo alert, targeting demo_alerts_per_hour over time.
     Alert failures are logged but never propagate — they must not crash the main loop.
     """
-    per_cycle_prob = min(0.90, _DEMO_ALERTS_PER_HOUR * interval / 3600)
+    rate = settings.get("demo_alerts_per_hour", DEMO_ALERTS_PER_HOUR)
+    per_cycle_prob = min(0.90, rate * interval / 3600)
     if random.random() >= per_cycle_prob:
         return
 
-    scenario = copy.deepcopy(random.choice(_DEMO_ALERT_SCENARIOS))
+    scenario = copy.deepcopy(random.choice(DEMO_ALERT_SCENARIOS))
     try:
         result = send_alert(config, scenario)
         log.info(
@@ -559,7 +569,7 @@ def run() -> None:
 
             # In demo mode, opportunistically submit a synthetic alert.
             if settings.get("demo_mode"):
-                _maybe_send_demo_alert(config, interval)
+                _maybe_send_demo_alert(config, settings, interval)
 
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None

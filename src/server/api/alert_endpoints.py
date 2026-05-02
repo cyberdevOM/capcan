@@ -21,8 +21,8 @@ alert_bp = Blueprint("alerts", __name__, url_prefix="/api/alerts")
 
 # ========== CONFIGURATION ==========
 
-# valid severities and levels (orderd by importance)
-VALID_SEVERITIES = ["info", "warning", "high", "critical"]
+# valid severities — must match the ALERT_SEVERITY DB enum
+VALID_SEVERITIES = ["critical", "high", "medium", "low", "info", "undefined"]
 
 # Valid event types
 VALID_EVENT_TYPES = [
@@ -410,18 +410,15 @@ def submit_bulk_alerts():  # TODO: Change endpoint to integrate with database
 
 # =========== Acknowledge alert endpoint ==========
 @alert_bp.route("/acknowledge/<alert_id>", methods=["POST"])
-def acknowledge_alert(alert_id):  # TODO: Change endpoint to integrate with database
+def acknowledge_alert(alert_id):
     """
-    Mark an alert as acknowledged by an administrator.
+    Mark an alert as acknowledged.
 
     Endpoint: POST /api/alerts/acknowledge/<alert_id>
 
-    This endpoint should require admin authentication in production.
-
-    request body (OPTIONAL):
+    Request body (optional):
     {
-        "acknowledged_by": string (admin username or ID)
-        "notes": string (optional notes about the acknowledgment)
+        "acknowledged_by": string
     }
 
     Response (success):
@@ -433,36 +430,20 @@ def acknowledge_alert(alert_id):  # TODO: Change endpoint to integrate with data
     }
     """
     try:
-        # check if alert exists
-        if alert_id not in MOCK_ALERTS:
+        data = request.get_json() or {}
+        acknowledged_by = data.get("acknowledged_by", "server")
+        current_time = dt.datetime.now(dt.timezone.utc).isoformat() + "Z"
+
+        ok = database.acknowledge_alert(alert_id, acknowledged_by=acknowledged_by)
+        if not ok:
             return jsonify({"error": "Alert not found.", "alert_id": alert_id}), 404
 
-        # Get optional acknowledgment data
-        data = request.get_json() or {}
-
-        # update alert status
-        current_time = dt.datetime.now(dt.timezone.utc).isoformat() + "Z"
-        MOCK_ALERTS[alert_id]["acknowledged"] = True
-        MOCK_ALERTS[alert_id]["acknowledged_at"] = current_time
-        MOCK_ALERTS[alert_id]["acknowledged_by"] = data.get(
-            "acknowledged_by", "unknown"
-        )
-
-        # add notes if provided
-        if "notes" in data:
-            MOCK_ALERTS[alert_id]["notes"] = data["notes"]
-
-        return (
-            jsonify(
-                {
-                    "status": "acknowledged",
-                    "alert_id": alert_id,
-                    "acknowledged_at": current_time,
-                    "acknowledged_by": MOCK_ALERTS[alert_id]["acknowledged_by"],
-                }
-            ),
-            200,
-        )
+        return jsonify({
+            "status": "acknowledged",
+            "alert_id": alert_id,
+            "acknowledged_at": current_time,
+            "acknowledged_by": acknowledged_by,
+        }), 200
 
     except Exception as e:
         return jsonify({"error": f"Failed to acknowledge alert: {str(e)}"}), 500
@@ -470,81 +451,43 @@ def acknowledge_alert(alert_id):  # TODO: Change endpoint to integrate with data
 
 # ========== GET ALERT HISTORY ENDPOINT ==========
 @alert_bp.route("/", methods=["GET"])
-def get_alert_history():  # TODO: Change endpoint to integrate with database
+def get_alert_history():
     """
     Retrieve alert history with optional filters.
 
     Endpoint: GET /api/alerts/
 
     Query Parameters:
-        ?client_id=uuid          # Filter by client ID
-        ?severity=string         # Filter by severity level
-        ?acknowledged=true/false # Filter by acknowledgment status
-        ?event_type=string       # Filter by event type
-        ?limit=integer           # Limit number of results
-
-    Response (success):
-    {
-        "alerts": [
-            {
-                "alert_id": string,
-                "client_id": string,
-                "severity": string,
-                "event_type": string,
-                "timestamp": ISO 8601 string,
-                "acknowledged": boolean,
-                "details": {...}
-            },
-            ...
-        ],
-        "total": integer,
-        "filtered": integer
-    }
+        ?client_id=uuid     Filter by client ID
+        ?severity=string    Filter by severity level
+        ?status=string      Filter by status (unresolved/acknowledged/resolved)
+        ?event_type=string  Filter by event type
+        ?limit=integer      Limit number of results (default 100)
     """
-
     try:
-        # get filter parameters
         client_id_filter = request.args.get("client_id")
         severity_filter = request.args.get("severity")
-        ack_filter = request.args.get("acknowledged")
+        status_filter = request.args.get("status")
         event_type_filter = request.args.get("event_type")
         limit = request.args.get("limit", type=int, default=100)
 
-        # start with all alerts
-        alerts = list(MOCK_ALERTS.values())
-
-        # apply filters
-        if client_id_filter:
-            alerts = [a for a in alerts if a["client_id"] == client_id_filter]
-
-        if severity_filter:
-            alerts = [a for a in alerts if a["severity"] == severity_filter]
-
-        if ack_filter is not None:
-            ack_bool = ack_filter.lower() == "true"
-            alerts = [a for a in alerts if a["acknowledged"] == ack_bool]
-
-        if event_type_filter:
-            alerts = [a for a in alerts if a["event_type"] == event_type_filter]
-
-        # sort by timestamp (newest first)
-        alerts.sort(key=lambda x: x["timestamp"], reverse=True)
-
-        # apply limit
-        filtered_count = len(alerts)
-        alerts = alerts[:limit]
-
-        return (
-            jsonify(
-                {
-                    "alerts": alerts,
-                    "total": len(MOCK_ALERTS),
-                    "filtered": filtered_count,
-                    "returned": len(alerts),
-                }
-            ),
-            200,
+        alerts = database.get_all_alerts(
+            client_id=client_id_filter,
+            severity=severity_filter,
+            status=status_filter,
+            event_type=event_type_filter,
+            limit=limit,
         )
+
+        # serialize datetimes
+        def _serialize(a):
+            for k in ("created_at", "acknowledged_at"):
+                if a.get(k) and hasattr(a[k], "isoformat"):
+                    a[k] = a[k].isoformat() + "Z"
+            return a
+
+        alerts = [_serialize(a) for a in alerts]
+        return jsonify({"alerts": alerts, "returned": len(alerts)}), 200
 
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve alerts: {str(e)}"}), 500
@@ -552,7 +495,7 @@ def get_alert_history():  # TODO: Change endpoint to integrate with database
 
 # ============ GET SINGLE ALERT ENDPOINT ============
 @alert_bp.route("/<alert_id>", methods=["GET"])
-def get_single_alert(alert_id):  # TODO: Change endpoint to integrate with database
+def get_single_alert(alert_id):
     """
     Get details of a single alert by its ID.
 
@@ -573,10 +516,47 @@ def get_single_alert(alert_id):  # TODO: Change endpoint to integrate with datab
     """
 
     try:
-        if alert_id not in MOCK_ALERTS:
+        row = None
+        try:
+            database.cursor.execute(
+                "SELECT alert_id, client_id, rule_id, severity, score, event_type, "
+                "status, acknowledged_at, acknowledged_by, created_at, details, tags "
+                "FROM client_alerts WHERE alert_id = %s",
+                (alert_id,),
+            )
+            row = database.cursor.fetchone()
+        except Exception as db_err:
+            print(f"[ERROR] get_single_alert DB: {db_err}")
+            if database.conn:
+                database.conn.rollback()
+
+        if not row:
             return jsonify({"error": "Alert not found.", "alert_id": alert_id}), 404
 
-        return jsonify(MOCK_ALERTS[alert_id]), 200
+        cols = ["alert_id", "client_id", "rule_id", "severity", "score", "event_type",
+                "status", "acknowledged_at", "acknowledged_by", "created_at", "details", "tags"]
+        alert = dict(zip(cols, row))
+        for k in ("created_at", "acknowledged_at"):
+            if alert.get(k) and hasattr(alert[k], "isoformat"):
+                alert[k] = alert[k].isoformat() + "Z"
+        return jsonify(alert), 200
 
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve alert: {str(e)}"}), 500
+
+
+# ============ RESOLVE ALERT ENDPOINT ============
+@alert_bp.route("/resolve/<alert_id>", methods=["POST"])
+def resolve_alert(alert_id):
+    """
+    Mark an alert as resolved.
+
+    Endpoint: POST /api/alerts/resolve/<alert_id>
+    """
+    try:
+        ok = database.resolve_alert(alert_id)
+        if not ok:
+            return jsonify({"error": "Alert not found.", "alert_id": alert_id}), 404
+        return jsonify({"status": "resolved", "alert_id": alert_id}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to resolve alert: {str(e)}"}), 500

@@ -612,25 +612,127 @@ class Database:
             print(f"Config-style insert failed, will try alternate schema: {e}")
 
     def get_alerts_by_client(self, client_id, status=None, limit=50):
-        """Retrieve alerts for a specific client, optionally filtered by status and limited in number."""
-        search_query = """
-        SELECT * FROM client_alerts WHERE client_id = %s AND status = %s ORDER BY created_at DESC LIMIT %s
-        """
-        params = (client_id, status, limit) if status else (client_id, limit)
+        """Retrieve alerts for a specific client, optionally filtered by status."""
         try:
-            self.cursor.execute(search_query, params)
+            if status:
+                query = """
+                SELECT * FROM client_alerts
+                WHERE client_id = %s AND status = %s
+                ORDER BY created_at DESC LIMIT %s
+                """
+                self.cursor.execute(query, (client_id, status, limit))
+            else:
+                query = """
+                SELECT * FROM client_alerts
+                WHERE client_id = %s
+                ORDER BY created_at DESC LIMIT %s
+                """
+                self.cursor.execute(query, (client_id, limit))
             return self.cursor.fetchall()
         except (psycopg2.DatabaseError, Exception) as error:
             print(error)
             if self.conn:
                 self.conn.rollback()
-            return None
+            return []
 
-    def acknowledge_alert(self, alert_id):
-        pass  # mark an alert as acknowledged in the database, indicating it has been seen by an analyst
+    def get_all_alerts(self, limit=100, status=None, severity=None, client_id=None, event_type=None):
+        """
+        Fetch alerts with optional filters for the web dashboard.
+        Returns a list of dicts with joined hostname from registered_clients.
+        """
+        conditions = []
+        params = []
+        if status:
+            conditions.append("ca.status = %s")
+            params.append(status)
+        if severity:
+            conditions.append("ca.severity = %s")
+            params.append(severity)
+        if client_id:
+            conditions.append("ca.client_id = %s")
+            params.append(client_id)
+        if event_type:
+            conditions.append("ca.event_type = %s")
+            params.append(event_type)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        params.append(limit)
+        query = f"""
+        SELECT ca.alert_id, ca.client_id, rc.hostname, ca.severity, ca.event_type,
+               ca.status, ca.created_at, ca.acknowledged_at, ca.acknowledged_by,
+               ca.details, ca.score, ca.rule_id, ca.tags
+        FROM client_alerts ca
+        LEFT JOIN registered_clients rc ON ca.client_id = rc.client_id
+        {where}
+        ORDER BY ca.created_at DESC
+        LIMIT %s
+        """
+        cols = [
+            'alert_id', 'client_id', 'hostname', 'severity', 'event_type',
+            'status', 'created_at', 'acknowledged_at', 'acknowledged_by',
+            'details', 'score', 'rule_id', 'tags',
+        ]
+        try:
+            self.cursor.execute(query, params)
+            return [dict(zip(cols, row)) for row in self.cursor.fetchall()]
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to get all alerts: {error}")
+            if self.conn:
+                self.conn.rollback()
+            return []
 
-    def resolve_alert(self, alert_id):
-        pass  # mark an alert as resolved in the database, indicating it has been addressed and is no longer active
+    def get_unresolved_alert_count(self) -> int:
+        """Return the count of unresolved alerts — used for the nav notification badge."""
+        try:
+            self.cursor.execute(
+                "SELECT COUNT(*) FROM client_alerts WHERE status = 'unresolved'"
+            )
+            row = self.cursor.fetchone()
+            return int(row[0]) if row else 0
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to get unresolved alert count: {error}")
+            if self.conn:
+                self.conn.rollback()
+            return 0
+
+    def acknowledge_alert(self, alert_id: str, acknowledged_by: str = 'admin') -> bool:
+        """Mark an alert as acknowledged. Returns True if a row was updated."""
+        try:
+            self.cursor.execute(
+                """
+                UPDATE client_alerts
+                SET status = 'acknowledged',
+                    acknowledged_at = NOW(),
+                    acknowledged_by = %s
+                WHERE alert_id = %s AND status = 'unresolved'
+                """,
+                (acknowledged_by, alert_id),
+            )
+            self.conn.commit()
+            return self.cursor.rowcount > 0
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to acknowledge alert '{alert_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return False
+
+    def resolve_alert(self, alert_id: str) -> bool:
+        """Mark an alert as resolved. Returns True if a row was updated."""
+        try:
+            self.cursor.execute(
+                """
+                UPDATE client_alerts
+                SET status = 'resolved'
+                WHERE alert_id = %s AND status != 'resolved'
+                """,
+                (alert_id,),
+            )
+            self.conn.commit()
+            return self.cursor.rowcount > 0
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to resolve alert '{alert_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return False
 
     # ============== CHANGES =========================
     def store_change(
@@ -732,6 +834,32 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             return None
+
+    def get_latest_settings(self, client_id: str):
+        """
+        Return the most recently pushed settings dict for a client (pending or applied),
+        along with whether it has been applied. Returns (settings_dict, is_pending) or
+        (None, False) if no config exists.
+        """
+        try:
+            self.cursor.execute(
+                """
+                SELECT config, applied_at IS NULL AS is_pending FROM client_configs
+                WHERE client_id = %s
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (client_id,),
+            )
+            row = self.cursor.fetchone()
+            if not row:
+                return None, False
+            return row[0], bool(row[1])
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(f"Failed to get latest settings for client '{client_id}': {error}")
+            if self.conn:
+                self.conn.rollback()
+            return None, False
 
     def store_configuration(self, client_id, config_id, config_name, config_data):
         pass  # store configuration data in the database

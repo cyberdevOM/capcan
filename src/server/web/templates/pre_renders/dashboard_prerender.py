@@ -3,19 +3,27 @@ from markupsafe import Markup
 import datetime
 
 from ....core.database import Database
+from ....utils.timestamper import get_current_timestamp
 
 
 # ─── helpers ────────────────────────────────────────────────────────────────
+
+def _utcnow():
+    """Return current UTC time as a naive datetime, using the project timestamper."""
+    return datetime.datetime.strptime(get_current_timestamp(), "%Y-%m-%dT%H:%M:%SZ")
+
 
 def _humanize_time(dt_obj):
     """Return a human-readable 'X ago' string from a datetime (or None)."""
     if dt_obj is None:
         return "Never"
-    now = datetime.datetime.now()
-    # strip timezone if present so subtraction works
+    now = _utcnow()
+    # strip timezone if present so subtraction works with naive DB timestamps
     if hasattr(dt_obj, "tzinfo") and dt_obj.tzinfo is not None:
         dt_obj = dt_obj.replace(tzinfo=None)
     seconds = (now - dt_obj).total_seconds()
+    if seconds < 0:
+        return "just now"
     if seconds < 60:
         return f"{int(seconds)}s ago"
     if seconds < 3600:
@@ -29,7 +37,7 @@ def _is_online(last_seen, threshold_seconds=600):
     """A client is online if its last telemetry arrived within threshold_seconds."""
     if last_seen is None:
         return False
-    now = datetime.datetime.now()
+    now = _utcnow()
     if hasattr(last_seen, "tzinfo") and last_seen.tzinfo is not None:
         last_seen = last_seen.replace(tzinfo=None)
     return (now - last_seen).total_seconds() <= threshold_seconds
@@ -213,18 +221,59 @@ def render_network_status():
 
 
 def render_alerts():
-    """Render alerts tile (placeholder — alert pipeline not yet connected)."""
-    html = """
-    <div class="alerts-list">
-        <div class="alert-item alert-info">
-            <i class="fas fa-info-circle"></i>
-            <div class="alert-content">
-                <div class="alert-message">Alert pipeline coming soon</div>
-                <div class="alert-time">—</div>
+    """Render top-5 recent alerts tile — clickable, links to alerts page with pre-selection."""
+    db = Database()
+    try:
+        alerts = db.get_all_alerts(limit=5)
+    finally:
+        db.close()
+
+    severity_icon = {
+        'critical':  ('fas fa-skull-crossbones', '#c0392b'),
+        'high':      ('fas fa-exclamation-triangle', '#e67e22'),
+        'medium':    ('fas fa-exclamation-circle', '#c49a0a'),
+        'low':       ('fas fa-info-circle', '#2980b9'),
+        'info':      ('fas fa-info-circle', '#27ae60'),
+        'undefined': ('fas fa-question-circle', '#7f8c8d'),
+    }
+
+    if not alerts:
+        html = """
+        <div class="alerts-list">
+            <div class="alert-item alert-info">
+                <i class="fas fa-check-circle"></i>
+                <div class="alert-content">
+                    <div class="alert-message">No alerts yet</div>
+                    <div class="alert-time">—</div>
+                </div>
             </div>
         </div>
-    </div>
-    """
+        """
+        return Markup(html)
+
+    html = '<div class="alerts-list">'
+    for a in alerts:
+        sev = (a.get('severity') or 'undefined').lower()
+        icon_cls, colour = severity_icon.get(sev, severity_icon['undefined'])
+        created = a.get('created_at')
+        time_str = _humanize_time(created) if created else '—'
+        hostname = a.get('hostname') or a.get('client_id', '?')
+        event = a.get('event_type') or 'Unknown event'
+        aid = a.get('alert_id', '')
+        status = a.get('status', 'unresolved')
+
+        html += f"""
+        <a class="alert-item alert-{sev} dash-alert-link" href="/alerts?selected={aid}" title="{event}">
+            <i class="{icon_cls}" style="color:{colour};margin-top:0.1rem;"></i>
+            <div class="alert-content">
+                <div class="alert-message">{event}</div>
+                <div class="alert-time">{hostname} &middot; {time_str} &middot;
+                    <span class="dash-alert-status dash-status-{status}">{status}</span>
+                </div>
+            </div>
+        </a>
+        """
+    html += '</div>'
     return Markup(html)
 
 

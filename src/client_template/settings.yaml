@@ -4,4 +4,5 @@ collect:
   memory: true
   disk: false
   network: true
+  demo_alerts_per_hour: 20
   processes: false
