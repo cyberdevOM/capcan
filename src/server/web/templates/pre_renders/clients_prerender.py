@@ -3,6 +3,7 @@ import datetime
 
 from ....core.database import Database
 from .dashboard_prerender import get_platform_icon, _humanize_time, _is_online
+from ....utils.timestamper import format_uptime
 
 
 def _fetch_clients():
@@ -116,130 +117,185 @@ def render_client_details(client_id=None):
         </div>
         """)
 
-    # row columns: client_id, client_number, hostname, client_os,
-    #              description, version, client_secret, registered_at, revoked, notes
     cols = ["client_id", "client_number", "hostname", "client_os",
             "description", "version", "client_secret", "registered_at", "revoked", "notes"]
     c = dict(zip(cols, row))
+    cid = c['client_id']
 
     status = "offline"
     if telemetry_row:
         status = "online" if _is_online(telemetry_row.get("timestamp")) else "offline"
 
     icon = get_platform_icon(c.get("client_os", ""))
+    os_label = (c.get('client_os') or 'Unknown').title()
+    ip_label = c.get('ip_address', '') or ''
+    subtitle = os_label + (f" &bull; {ip_label}" if ip_label else "")
+
     t = telemetry_row["telemetry"] if telemetry_row else {}
     cpu  = t.get("cpu_percent", "—")
     mem  = t.get("memory_percent", "—")
     disk = t.get("disk_usage", "—")
+    uptime_s = t.get("uptime_seconds")
+    uptime_disp = format_uptime(uptime_s) if uptime_s is not None else "—"
+    procs = t.get("process_count", "—")
 
-    cpu_w  = f"{cpu}%" if isinstance(cpu,  (int, float)) else "0%"
-    mem_w  = f"{mem}%" if isinstance(mem,  (int, float)) else "0%"
-    disk_w = f"{disk}%" if isinstance(disk, (int, float)) else "0%"
+    pending_badge = (
+        '<span class="pending-badge"><i class="fas fa-clock"></i> Pending</span>'
+        if pending_count > 0 else ''
+    )
+
+    def stat_card(icon_cls, label, value, unit=""):
+        val_str = f"{value}{unit}" if isinstance(value, (int, float)) else str(value)
+        return f"""
+        <div class="stat-card">
+            <div class="stat-icon"><i class="{icon_cls}"></i></div>
+            <div class="stat-info">
+                <div class="stat-label">{label}</div>
+                <div class="stat-value">{val_str}</div>
+            </div>
+        </div>"""
+
+    stats_html = (
+        stat_card("fas fa-microchip", "CPU", cpu, "%" if isinstance(cpu, (int, float)) else "") +
+        stat_card("fas fa-memory", "Memory", mem, "%" if isinstance(mem, (int, float)) else "") +
+        stat_card("fas fa-hdd", "Disk", disk, "%" if isinstance(disk, (int, float)) else "") +
+        stat_card("fas fa-clock", "Uptime", uptime_disp) +
+        stat_card("fas fa-tasks", "Processes", procs)
+    )
+
+    config_html = f"""
+    <div class="config-form" id="config-form-{cid}">
+        <div class="config-row">
+            <label class="config-label">Report interval (minutes)</label>
+            <input type="number" class="config-input" id="cfg-interval-{cid}"
+                   min="1" max="60"
+                   value="{round(effective_settings.get('interval', 300) / 60)}">
+        </div>
+        <div class="config-row">
+            <label class="config-label">Collect</label>
+            <div class="config-toggles">
+                {_collect_toggle(cid, 'cpu',       'CPU',       effective_settings)}
+                {_collect_toggle(cid, 'memory',    'Memory',    effective_settings)}
+                {_collect_toggle(cid, 'disk',      'Disk',      effective_settings)}
+                {_collect_toggle(cid, 'network',   'Network',   effective_settings)}
+                {_collect_toggle(cid, 'processes', 'Processes', effective_settings)}
+            </div>
+        </div>
+        <div class="config-actions">
+            <button class="control-btn primary"
+                    onclick="pushConfig(['{cid}'], '{cid}')">
+                <i class="fas fa-upload"></i> Apply to this client
+            </button>
+            <button class="control-btn secondary btn-configure-selected"
+                    onclick="pushConfigToSelected('{cid}')">
+                <i class="fas fa-layer-group"></i> Apply to all selected
+            </button>
+        </div>
+        <div class="config-status" id="cfg-status-{cid}"></div>
+    </div>"""
 
     html = f"""
-    <div class="client-details-content">
-        <div class="client-header">
-            <div class="client-header-main">
-                <i class="{icon}"></i>
-                <div class="client-header-info">
-                    <h2>{c['hostname']}</h2>
-                    <span class="client-platform-detail">{(c.get('client_os') or 'unknown').title()}</span>
-                </div>
-            </div>
+    <div class="client-panel" data-client-id="{cid}">
 
-            <div class="client-info-grid">
-                <div class="info-card">
-                    <div class="info-label">Status</div>
-                    <div class="info-value">{status.title()}</div>
+        <div class="panel-header">
+            <div class="panel-header-left">
+                <i class="{icon} panel-platform-icon"></i>
+                <div class="panel-header-info">
+                    <h2 class="panel-hostname">{c['hostname']}</h2>
+                    <span class="panel-subtitle">{subtitle}</span>
                 </div>
-                <div class="info-card">
-                    <div class="info-label">Last Seen</div>
-                    <div class="info-value">{_humanize_time(telemetry_row['timestamp'] if telemetry_row else None)}</div>
-                </div>
-                <div class="info-card">
-                    <div class="info-label">Platform</div>
-                    <div class="info-value">{(c.get('client_os') or 'unknown').title()}</div>
-                </div>
-                <div class="info-card">
-                    <div class="info-label">Version</div>
-                    <div class="info-value">{c.get('version', 'N/A')}</div>
-                </div>
+                <span class="panel-status-badge {status}">
+                    <span class="status-dot {status}"></span>
+                    {status.title()}
+                </span>
             </div>
-
-            <div class="client-controls">
-                <button class="control-btn primary" onclick="connectClient('{c['client_id']}')">
-                    <i class="fas fa-plug"></i> Connect
-                </button>
-                <button class="control-btn secondary" onclick="showLogs('{c['client_id']}')">
+            <div class="panel-header-actions">
+                <button class="control-btn secondary" onclick="showLogs('{cid}')">
                     <i class="fas fa-file-alt"></i> Logs
                 </button>
-                <button class="control-btn danger" onclick="disconnectClient('{c['client_id']}')">
-                    <i class="fas fa-unplug"></i> Disconnect
+                <button class="control-btn primary" onclick="connectClient('{cid}')">
+                    <i class="fas fa-plug"></i> Connect
                 </button>
             </div>
+        </div>
 
-            <div class="client-performance">
-                <h4>Latest Telemetry</h4>
-                <div class="performance-metrics">
-                    <div class="metric">
-                        <div class="metric-label">CPU Usage</div>
-                        <div class="metric-bar">
-                            <div class="metric-fill" style="width:{cpu_w}"></div>
-                            <span class="metric-text">{cpu}{"%" if isinstance(cpu, (int,float)) else ""}</span>
+        <div class="panel-body">
+
+            <div class="panel-data">
+
+                <div class="panel-stats-row">
+                    {stats_html}
+                </div>
+
+                <div class="panel-section-label">
+                    <i class="fas fa-chart-line"></i> Telemetry History
+                </div>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <span class="chart-title">CPU Usage</span>
+                            <span class="chart-unit">%</span>
                         </div>
+                        <div class="chart-wrap"><canvas id="chart-cpu-{cid}"></canvas></div>
                     </div>
-                    <div class="metric">
-                        <div class="metric-label">Memory</div>
-                        <div class="metric-bar">
-                            <div class="metric-fill" style="width:{mem_w}"></div>
-                            <span class="metric-text">{mem}{"%" if isinstance(mem, (int,float)) else ""}</span>
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <span class="chart-title">Memory Usage</span>
+                            <span class="chart-unit">%</span>
                         </div>
+                        <div class="chart-wrap"><canvas id="chart-mem-{cid}"></canvas></div>
                     </div>
-                    <div class="metric">
-                        <div class="metric-label">Disk Usage</div>
-                        <div class="metric-bar">
-                            <div class="metric-fill" style="width:{disk_w}"></div>
-                            <span class="metric-text">{disk}{"%" if isinstance(disk, (int,float)) else ""}</span>
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <span class="chart-title">Disk Usage</span>
+                            <span class="chart-unit">%</span>
                         </div>
+                        <div class="chart-wrap"><canvas id="chart-disk-{cid}"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <span class="chart-title">Network I/O</span>
+                            <span class="chart-unit">KB</span>
+                        </div>
+                        <div class="chart-wrap"><canvas id="chart-net-{cid}"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="panel-config-section">
+                    <button class="panel-config-toggle" onclick="togglePanelConfig('{cid}')">
+                        <i class="fas fa-sliders-h"></i>
+                        Remote Settings
+                        {pending_badge}
+                        <i class="fas fa-chevron-down panel-config-chevron" id="cfg-chevron-{cid}"></i>
+                    </button>
+                    <div class="panel-config-body" id="cfg-body-{cid}">
+                        {config_html}
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="panel-alerts-section">
+                <div class="panel-alerts-header">
+                    <span class="panel-section-label">
+                        <i class="fas fa-bell"></i> Alerts
+                    </span>
+                    <div class="alert-filter-pills">
+                        <button class="alert-pill active" data-filter="all"
+                                onclick="filterPanelAlerts(this, '{cid}')">All</button>
+                        <button class="alert-pill" data-filter="unresolved"
+                                onclick="filterPanelAlerts(this, '{cid}')">Open</button>
+                        <button class="alert-pill" data-filter="critical"
+                                onclick="filterPanelAlerts(this, '{cid}')">Critical</button>
+                    </div>
+                </div>
+                <div class="panel-alerts-list" id="panel-alerts-{cid}">
+                    <div class="panel-alerts-loading">
+                        <i class="fas fa-spinner fa-spin"></i> Loading&hellip;
                     </div>
                 </div>
             </div>
 
-            <div class="client-remote-config">
-                <h4>
-                    Remote Settings
-                    {('<span class="pending-badge"><i class="fas fa-clock"></i> Pending</span>') if pending_count > 0 else ''}
-                </h4>
-                <div class="config-form" id="config-form-{c['client_id']}">
-                    <div class="config-row">
-                        <label class="config-label">Report interval (seconds)</label>
-                        <input type="number" class="config-input" id="cfg-interval-{c['client_id']}"
-                               min="10" max="86400"
-                               value="{effective_settings.get('interval', 300)}">
-                    </div>
-                    <div class="config-row">
-                        <label class="config-label">Collect</label>
-                        <div class="config-toggles">
-                            {_collect_toggle(c['client_id'], 'cpu',       'CPU',       effective_settings)}
-                            {_collect_toggle(c['client_id'], 'memory',    'Memory',    effective_settings)}
-                            {_collect_toggle(c['client_id'], 'disk',      'Disk',      effective_settings)}
-                            {_collect_toggle(c['client_id'], 'network',   'Network',   effective_settings)}
-                            {_collect_toggle(c['client_id'], 'processes', 'Processes', effective_settings)}
-                        </div>
-                    </div>
-                    <div class="config-actions">
-                        <button class="control-btn primary"
-                                onclick="pushConfig(['{c['client_id']}'], '{c['client_id']}')">
-                            <i class="fas fa-upload"></i> Apply to this client
-                        </button>
-                        <button class="control-btn secondary"
-                                onclick="pushConfigToSelected('{c['client_id']}')">
-                            <i class="fas fa-layer-group"></i> Apply to all selected
-                        </button>
-                    </div>
-                    <div class="config-status" id="cfg-status-{c['client_id']}"></div>
-                </div>
-            </div>
         </div>
     </div>
     """

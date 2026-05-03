@@ -1,5 +1,6 @@
 let _activeClientId = null;
 let _activeClientName = null;
+const _chartInstances = {};
 
 // ── Client selection ──────────────────────────────────────────
 function selectClient(clientId) {
@@ -7,8 +8,8 @@ function selectClient(clientId) {
     _activeClientName = document.querySelector(`.client-item[data-client-id="${clientId}"] .client-id`)?.textContent || clientId;
     document.getElementById('deleteClientBtn').disabled = false;
 
-    // Card click = exclusive single select; clear all checkboxes
-    document.querySelectorAll('.client-select').forEach(el => { el.checked = false; });
+    // Card click = exclusive single select; check only this client's checkbox
+    document.querySelectorAll('.client-select').forEach(el => { el.checked = el.value === clientId; });
     onClientCheckboxChange();
 
     fetch(`/clients?client_id=${clientId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
@@ -17,7 +18,10 @@ function selectClient(clientId) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const newDetails = doc.getElementById('clientDetails');
-            if (newDetails) document.getElementById('clientDetails').innerHTML = newDetails.innerHTML;
+            if (newDetails) {
+                document.getElementById('clientDetails').innerHTML = newDetails.innerHTML;
+                loadClientPanel(clientId);
+            }
         });
     document.querySelectorAll('.client-item').forEach(el =>
         el.classList.toggle('active', el.dataset.clientId === clientId));
@@ -43,6 +47,210 @@ function disconnectClient(clientId) {
     console.log(`Disconnecting client ${clientId}`);
 }
 
+// ── Client Panel (charts + alerts) ───────────────────────────
+function loadClientPanel(clientId) {
+    // Destroy any Chart.js instances from the previous client
+    Object.keys(_chartInstances).forEach(k => {
+        _chartInstances[k].destroy();
+        delete _chartInstances[k];
+    });
+    _fetchTelemetryAndRenderCharts(clientId);
+    _loadPanelAlerts(clientId, 'all');
+}
+
+function _fetchTelemetryAndRenderCharts(clientId) {
+    fetch(`/api/v1/telemetry/web/${clientId}/history?limit=50`)
+        .then(r => r.json())
+        .then(data => _renderCharts(clientId, data.telemetry || []))
+        .catch(() => _renderCharts(clientId, []));
+}
+
+function _renderCharts(clientId, rows) {
+    if (typeof Chart === 'undefined') return;
+
+    const labels = rows.map(r => {
+        const d = new Date(r.timestamp);
+        return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    });
+
+    const sharedOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+            legend: {display: false},
+            tooltip: {
+                backgroundColor: '#1a1a2e',
+                titleColor: '#d6d6e6',
+                bodyColor: '#a0a0b0',
+                borderColor: '#2e2e3e',
+                borderWidth: 1,
+            },
+        },
+        scales: {
+            x: {
+                ticks: {color: '#7a7a9a', maxTicksLimit: 6, maxRotation: 0},
+                grid:  {color: 'rgba(255,255,255,0.05)'},
+            },
+            y: {
+                ticks: {color: '#7a7a9a'},
+                grid:  {color: 'rgba(255,255,255,0.05)'},
+                beginAtZero: true,
+            },
+        },
+    };
+
+    function makeLineChart(canvasId, data, color, yMax) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return null;
+        const opts = JSON.parse(JSON.stringify(sharedOptions));
+        if (yMax !== undefined) opts.scales.y.max = yMax;
+        return new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    data,
+                    borderColor: color,
+                    backgroundColor: color + '22',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true,
+                    tension: 0.3,
+                }],
+            },
+            options: opts,
+        });
+    }
+
+    const cpuData  = rows.map(r => r.telemetry?.cpu_percent     ?? null);
+    const memData  = rows.map(r => r.telemetry?.memory_percent  ?? null);
+    const diskData = rows.map(r => r.telemetry?.disk_usage      ?? null);
+    const sentData = rows.map(r => r.telemetry?.network_sent_bytes != null
+        ? Math.round(r.telemetry.network_sent_bytes / 1024) : null);
+    const recvData = rows.map(r => r.telemetry?.network_recv_bytes != null
+        ? Math.round(r.telemetry.network_recv_bytes / 1024) : null);
+
+    const c1 = makeLineChart(`chart-cpu-${clientId}`,  cpuData,  '#4ade80', 100);
+    const c2 = makeLineChart(`chart-mem-${clientId}`,  memData,  '#60a5fa', 100);
+    const c3 = makeLineChart(`chart-disk-${clientId}`, diskData, '#f59e0b', 100);
+    if (c1) _chartInstances[`cpu-${clientId}`]  = c1;
+    if (c2) _chartInstances[`mem-${clientId}`]  = c2;
+    if (c3) _chartInstances[`disk-${clientId}`] = c3;
+
+    // Network: two datasets (sent + received)
+    const netCanvas = document.getElementById(`chart-net-${clientId}`);
+    if (netCanvas) {
+        const opts = JSON.parse(JSON.stringify(sharedOptions));
+        opts.plugins.legend.display = true;
+        opts.plugins.legend.labels = {color: '#a0a0b0', boxWidth: 10, font: {size: 10}};
+        _chartInstances[`net-${clientId}`] = new Chart(netCanvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {label: 'Sent',  data: sentData, borderColor: '#a78bfa', backgroundColor: '#a78bfa22', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3},
+                    {label: 'Recv',  data: recvData, borderColor: '#34d399', backgroundColor: '#34d39922', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3},
+                ],
+            },
+            options: opts,
+        });
+    }
+
+    // Show "no data" placeholder when there are no telemetry rows
+    if (rows.length === 0) {
+        ['cpu', 'mem', 'disk', 'net'].forEach(k => {
+            const wrap = document.getElementById(`chart-${k}-${clientId}`)?.closest('.chart-wrap');
+            if (wrap) wrap.innerHTML = '<div class="chart-no-data"><i class="fas fa-chart-line"></i><span>No data yet</span></div>';
+        });
+    }
+}
+
+// ── Panel alerts ──────────────────────────────────────────────
+function _loadPanelAlerts(clientId, filter) {
+    const container = document.getElementById(`panel-alerts-${clientId}`);
+    if (!container) return;
+    container.innerHTML = '<div class="panel-alerts-loading"><i class="fas fa-spinner fa-spin"></i></div>';
+
+    let url = `/api/v1/web/alerts?client_id=${clientId}&limit=100`;
+    if (filter === 'unresolved') url += '&status=unresolved';
+    if (filter === 'critical')   url += '&severity=critical';
+
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            const alerts = data.alerts || [];
+            if (alerts.length === 0) {
+                container.innerHTML = '<div class="panel-alerts-empty"><i class="fas fa-check-circle"></i><span>No alerts found</span></div>';
+                return;
+            }
+            container.innerHTML = alerts.map(a => _renderPanelAlertItem(a, clientId)).join('');
+        })
+        .catch(() => {
+            if (container) container.innerHTML = '<div class="panel-alerts-empty">Failed to load alerts.</div>';
+        });
+}
+
+function filterPanelAlerts(btn, clientId) {
+    btn.closest('.alert-filter-pills').querySelectorAll('.alert-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    _loadPanelAlerts(clientId, btn.dataset.filter);
+}
+
+function _renderPanelAlertItem(a, clientId) {
+    const severityColors = {critical: '#f87171', high: '#fb923c', medium: '#fbbf24', low: '#60a5fa', info: '#a78bfa'};
+    const color = severityColors[a.severity] || '#a0a0b0';
+    const time  = _panelRelativeTime(a.created_at);
+    const statusClass = a.status === 'unresolved' ? 'unresolved' : a.status === 'acknowledged' ? 'acknowledged' : 'resolved';
+    const statusLabel = a.status === 'unresolved' ? 'Open' : a.status === 'acknowledged' ? 'Ack' : 'Done';
+    const ackBtn = a.status === 'unresolved'
+        ? `<button class="panel-alert-btn" title="Acknowledge" onclick="ackPanelAlert('${a.alert_id}','${clientId}')"><i class="fas fa-check"></i></button>`
+        : '';
+    return `
+    <div class="panel-alert-item" data-alert-id="${a.alert_id}">
+        <div class="panel-alert-severity-bar" style="background:${color}"></div>
+        <div class="panel-alert-content">
+            <div class="panel-alert-top">
+                <span class="panel-alert-type">${a.event_type || 'alert'}</span>
+                <span class="panel-alert-status ${statusClass}">${statusLabel}</span>
+            </div>
+            <div class="panel-alert-time">${time}</div>
+        </div>
+        <div class="panel-alert-actions">${ackBtn}</div>
+    </div>`;
+}
+
+function ackPanelAlert(alertId, clientId) {
+    fetch(`/api/v1/web/alerts/${alertId}/acknowledge`, {method: 'POST'})
+        .then(() => {
+            const activeFilter = document.querySelector(`#panel-alerts-${clientId}`)
+                ?.closest('.panel-alerts-section')
+                ?.querySelector('.alert-pill.active')
+                ?.dataset.filter || 'all';
+            _loadPanelAlerts(clientId, activeFilter);
+        });
+}
+
+function _panelRelativeTime(isoStr) {
+    if (!isoStr) return '—';
+    const diffMs = Date.now() - new Date(isoStr).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1)  return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)  return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function togglePanelConfig(clientId) {
+    const body    = document.getElementById(`cfg-body-${clientId}`);
+    const chevron = document.getElementById(`cfg-chevron-${clientId}`);
+    if (!body) return;
+    const opening = body.style.display === 'none' || body.style.display === '';
+    body.style.display    = opening ? 'block' : 'none';
+    if (chevron) chevron.style.transform = opening ? 'rotate(180deg)' : '';
+}
+
 // ── Multi-select ──────────────────────────────────────────────
 function toggleSelectAll(cb) {
     document.querySelectorAll('.client-select').forEach(el => { el.checked = cb.checked; });
@@ -65,7 +273,8 @@ function getSelectedClientIds() {
 
 // ── Config push ───────────────────────────────────────────────
 function _readConfigForm(clientId) {
-    const interval = parseInt(document.getElementById(`cfg-interval-${clientId}`)?.value || '300', 10);
+    const intervalMinutes = parseInt(document.getElementById(`cfg-interval-${clientId}`)?.value || '5', 10);
+    const interval = intervalMinutes * 60;
     const keys = ['cpu', 'memory', 'disk', 'network', 'processes'];
     const collect = {};
     keys.forEach(k => {
@@ -79,7 +288,7 @@ function pushConfig(clientIds, formSourceId) {
     const settings = _readConfigForm(formSourceId);
     const statusEl = document.getElementById(`cfg-status-${formSourceId}`);
 
-    fetch('/api/clients/config', {
+    fetch('/api/v1/clients/config', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ client_ids: clientIds, settings })
@@ -154,7 +363,7 @@ function submitAddClient() {
     errorEl.textContent = '';
     _setAddLoading(true);
 
-    fetch('/api/clients/admin/add', {
+    fetch('/api/v1/clients/admin/add', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ username, ip_address, password })
@@ -204,7 +413,7 @@ function confirmDeleteClient() {
     errorEl.textContent = '';
     _setDeleteLoading(true);
 
-    fetch(`/api/clients/admin/${_activeClientId}`, {
+    fetch(`/api/v1/clients/admin/${_activeClientId}`, {
         method: 'DELETE',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ password })
