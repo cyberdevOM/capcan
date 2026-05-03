@@ -46,17 +46,17 @@ def render_client_settings():
     html = """
     <div class="setting-item">
         <div class="setting-info">
-            <div class="setting-label">Heartbeat Interval</div>
-            <div class="setting-description">How often clients send a heartbeat signal (seconds).</div>
+            <div class="setting-label">Telemetry Report Interval (seconds)</div>
+            <div class="setting-description">How often clients collect and send telemetry data to the server. Default is 300 seconds (5 minutes).</div>
         </div>
         <div class="setting-control">
-            <input type="number" class="settings-number-input" value="30" min="5" max="300" id="heartbeatInterval">
+            <input type="number" class="settings-number-input" value="300" min="10" max="86400" id="heartbeatInterval">
         </div>
     </div>
     <div class="setting-item">
         <div class="setting-info">
             <div class="setting-label">Connection Timeout</div>
-            <div class="setting-description">Mark a client offline after this many missed heartbeats.</div>
+            <div class="setting-description">Mark a client offline after this many missed telemetry reports.</div>
         </div>
         <div class="setting-control">
             <input type="number" class="settings-number-input" value="3" min="1" max="10" id="connectionTimeout">
