@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Hash with the fixed application salt — same result as pre_hash_client_password() on the backend
     const clientHash = await dcodeIO.bcrypt.hash(password, CLIENT_BCRYPT_SALT);
 
-    fetch('/api/login', {
+    fetch('/api/v1/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password: clientHash })
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const clientHash = await dcodeIO.bcrypt.hash(password, CLIENT_BCRYPT_SALT);
 
-    fetch('/api/register', {
+    fetch('/api/v1/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, email, password: clientHash })

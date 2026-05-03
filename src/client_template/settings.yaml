@@ -1,8 +1,0 @@
-interval: 60
-collect:
-  cpu: true
-  memory: true
-  disk: false
-  network: true
-  demo_alerts_per_hour: 20
-  processes: false

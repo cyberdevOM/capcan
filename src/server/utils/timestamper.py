@@ -10,4 +10,15 @@ def parse_timestamp(timestamp_str):
         return dt.datetime.strptime(timestamp_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
     except ValueError as e:
         raise ValueError(f"Invalid timestamp format: {timestamp_str}. Expected ISO 8601 with 'Z' suffix.") from e
-    
+
+def format_uptime(seconds: int) -> str:
+    """Format an uptime duration in seconds to a compact human-readable string."""
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    if seconds < 86400:
+        h, m = divmod(seconds, 3600)
+        return f"{h}h {m // 60}m"
+    d, rem = divmod(seconds, 86400)
+    return f"{d}d {rem // 3600}h"

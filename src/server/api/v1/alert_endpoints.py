@@ -7,17 +7,17 @@ from typing import Dict, Any, List
 from src.server.utils.timestamper import parse_timestamp, get_current_timestamp
 import uuid
 from werkzeug.exceptions import BadRequest
-from ..utils.validators import (
+from ...utils.validators import (
     validate_timestamp,
     validate_signature,
     extract_security_headers,
     generate_ack_id,
 )
 
-from ..core.database import Database
+from ...core.database import Database
 
 # Create Flask Blueprint for alert endpoints
-alert_bp = Blueprint("alerts", __name__, url_prefix="/api/alerts")
+alert_bp = Blueprint("alerts", __name__, url_prefix="/alerts")
 
 # ========== CONFIGURATION ==========
 

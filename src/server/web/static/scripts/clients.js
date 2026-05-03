@@ -167,14 +167,17 @@ function _renderCharts(clientId, rows) {
 }
 
 // ── Panel alerts ──────────────────────────────────────────────
-function _loadPanelAlerts(clientId, filter) {
+function _loadPanelAlerts(clientId, filter, silent = false) {
     const container = document.getElementById(`panel-alerts-${clientId}`);
     if (!container) return;
-    container.innerHTML = '<div class="panel-alerts-loading"><i class="fas fa-spinner fa-spin"></i></div>';
+    if (!silent) {
+        container.innerHTML = '<div class="panel-alerts-loading"><i class="fas fa-spinner fa-spin"></i></div>';
+    }
 
     let url = `/api/v1/web/alerts?client_id=${clientId}&limit=100`;
-    if (filter === 'unresolved') url += '&status=unresolved';
-    if (filter === 'critical')   url += '&severity=critical';
+    if (filter === 'unresolved')   url += '&status=unresolved';
+    if (filter === 'acknowledged') url += '&status=acknowledged';
+    if (filter === 'critical')     url += '&severity=critical';
 
     fetch(url)
         .then(r => r.json())
@@ -203,32 +206,75 @@ function _renderPanelAlertItem(a, clientId) {
     const time  = _panelRelativeTime(a.created_at);
     const statusClass = a.status === 'unresolved' ? 'unresolved' : a.status === 'acknowledged' ? 'acknowledged' : 'resolved';
     const statusLabel = a.status === 'unresolved' ? 'Open' : a.status === 'acknowledged' ? 'Ack' : 'Done';
+
+    // Parse a human-readable detail snippet from the details JSON blob
+    let detailSnippet = '';
+    if (a.details) {
+        try {
+            const d = typeof a.details === 'string' ? JSON.parse(a.details) : a.details;
+            if (d.message)        detailSnippet = d.message;
+            else if (d.value != null && d.threshold != null)
+                detailSnippet = `Value ${d.value} exceeded threshold ${d.threshold}`;
+            else if (d.process)   detailSnippet = `Process: ${d.process}`;
+            else {
+                const first = Object.entries(d)[0];
+                if (first) detailSnippet = `${first[0]}: ${first[1]}`;
+            }
+        } catch(_) {}
+    }
+
+    const scoreHtml = a.score != null
+        ? `<span class="panel-alert-score" title="Risk score">${Math.round(a.score)}</span>`
+        : '';
+
     const ackBtn = a.status === 'unresolved'
         ? `<button class="panel-alert-btn" title="Acknowledge" onclick="ackPanelAlert('${a.alert_id}','${clientId}')"><i class="fas fa-check"></i></button>`
         : '';
+    const resBtn = a.status !== 'resolved'
+        ? `<button class="panel-alert-btn resolve" title="Resolve" onclick="resolvePanelAlert('${a.alert_id}','${clientId}')"><i class="fas fa-times"></i></button>`
+        : '';
+
     return `
     <div class="panel-alert-item" data-alert-id="${a.alert_id}">
         <div class="panel-alert-severity-bar" style="background:${color}"></div>
         <div class="panel-alert-content">
             <div class="panel-alert-top">
                 <span class="panel-alert-type">${a.event_type || 'alert'}</span>
+                <span class="panel-alert-sev-badge" style="color:${color};border-color:${color}20;background:${color}15">${a.severity || '?'}</span>
+                ${scoreHtml}
                 <span class="panel-alert-status ${statusClass}">${statusLabel}</span>
             </div>
-            <div class="panel-alert-time">${time}</div>
+            ${detailSnippet ? `<div class="panel-alert-detail">${_escPanelHtml(detailSnippet)}</div>` : ''}
+            <div class="panel-alert-time"><i class="fas fa-clock" style="opacity:.5;margin-right:3px"></i>${time}</div>
         </div>
-        <div class="panel-alert-actions">${ackBtn}</div>
+        <div class="panel-alert-actions">${ackBtn}${resBtn}</div>
     </div>`;
 }
 
+function _escPanelHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function ackPanelAlert(alertId, clientId) {
+    const el = document.querySelector(`[data-alert-id="${alertId}"]`);
+    if (el) el.style.opacity = '0.4';
     fetch(`/api/v1/web/alerts/${alertId}/acknowledge`, {method: 'POST'})
-        .then(() => {
-            const activeFilter = document.querySelector(`#panel-alerts-${clientId}`)
-                ?.closest('.panel-alerts-section')
-                ?.querySelector('.alert-pill.active')
-                ?.dataset.filter || 'all';
-            _loadPanelAlerts(clientId, activeFilter);
-        });
+        .then(() => _reloadPanelAlerts(clientId));
+}
+
+function resolvePanelAlert(alertId, clientId) {
+    const el = document.querySelector(`[data-alert-id="${alertId}"]`);
+    if (el) el.style.opacity = '0.4';
+    fetch(`/api/v1/web/alerts/${alertId}/resolve`, {method: 'POST'})
+        .then(() => _reloadPanelAlerts(clientId));
+}
+
+function _reloadPanelAlerts(clientId) {
+    const activeFilter = document.querySelector(`#panel-alerts-${clientId}`)
+        ?.closest('.panel-alerts-section')
+        ?.querySelector('.alert-pill.active')
+        ?.dataset.filter || 'all';
+    _loadPanelAlerts(clientId, activeFilter, true); // silent = no loading flash
 }
 
 function _panelRelativeTime(isoStr) {

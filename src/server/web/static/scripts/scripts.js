@@ -398,6 +398,7 @@ function pushDemoAlertRate() {
 }
 
 
+function refreshDemoStatus() {
     const statusText = document.getElementById('demoStatusText');
     const toggle = document.getElementById('demoModeToggle');
     if (!statusText || !toggle) return;

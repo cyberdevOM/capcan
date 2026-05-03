@@ -285,6 +285,8 @@ def render_client_details(client_id=None):
                                 onclick="filterPanelAlerts(this, '{cid}')">All</button>
                         <button class="alert-pill" data-filter="unresolved"
                                 onclick="filterPanelAlerts(this, '{cid}')">Open</button>
+                        <button class="alert-pill" data-filter="acknowledged"
+                                onclick="filterPanelAlerts(this, '{cid}')">Ack</button>
                         <button class="alert-pill" data-filter="critical"
                                 onclick="filterPanelAlerts(this, '{cid}')">Critical</button>
                     </div>
