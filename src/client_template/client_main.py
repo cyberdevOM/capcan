@@ -11,8 +11,8 @@ Config files (both live next to the executable):
 
 Flow:
   1. Load config.yaml + settings.yaml
-  2. If not yet registered, POST to /api/clients/register and save credentials
-  3. Loop: collect metrics → sign with HMAC → POST to /api/telemetry/
+  2. If not yet registered, POST to /api/v1/clients/register and save credentials
+  3. Loop: collect metrics → sign with HMAC → POST to /api/v1/telemetry/
            → apply any settings pushed from dashboard → sleep
 """
 
@@ -162,7 +162,7 @@ def register(config: dict) -> dict:
     Returns an updated config dict with client_id and secret_key populated.
     Raises on failure so the caller can decide whether to abort or retry.
     """
-    url = config["server_url"].rstrip("/") + "/api/clients/register"
+    url = config["server_url"].rstrip("/") + "/api/v1/clients/register"
     payload = {
         "hostname": socket.gethostname(),
         "platform": detect_platform(),
@@ -472,7 +472,7 @@ def send_telemetry(config: dict, metrics: dict) -> dict:
     Returns the parsed JSON response on success.
     Raises requests.HTTPError on HTTP error responses.
     """
-    url = config["server_url"].rstrip("/") + "/api/telemetry/"
+    url = config["server_url"].rstrip("/") + "/api/v1/telemetry/"
     body_bytes = json.dumps(metrics, separators=(",", ":")).encode("utf-8")
     headers = sign_request(config["client_id"], config["secret_key"], body_bytes)
 
@@ -487,7 +487,7 @@ def send_alert(config: dict, alert_data: dict) -> dict:
     Uses the same HMAC scheme as send_telemetry.
     Raises requests.HTTPError on HTTP error responses.
     """
-    url = config["server_url"].rstrip("/") + "/api/alerts/"
+    url = config["server_url"].rstrip("/") + "/api/v1/alerts/"
     body_bytes = json.dumps(alert_data, separators=(",", ":")).encode("utf-8")
     headers = sign_request(config["client_id"], config["secret_key"], body_bytes)
 
