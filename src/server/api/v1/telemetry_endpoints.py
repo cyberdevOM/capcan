@@ -1,25 +1,22 @@
 """
 Telemetry API Endpoints
 
-This module handles system telemetry data submissions from clients.
-- CPU usage, memory, disk I/O
-- Network statistics
-- process information
-- custom metrics
+Handles telemetry data submitted by clients:
+- CPU, memory, disk, network, process metrics
+- Data is stored in and read from the database
+- HMAC authentication on all client-facing routes
 
-Data Flow
-1. Client collects metrics (CPU, RAM, disk, network)
-2. Client signs data with HMAC
-3. Client sends POST request to /api/telemetry
-4. Server validates signature
-5. Server stores data (mock dictg for temp, database in prod)
-6. Server returns acknowledgement
+Data Flow:
+1. Client collects metrics and signs payload with HMAC
+2. Client POSTs to /api/v1/telemetry/
+3. Server validates signature and stores to DB
+4. Server returns acknowledgement + any pending config
 """
 
 from flask import Blueprint, request, jsonify
 from datetime import datetime
-from typing import Dict, Any, List
-import time
+from typing import Dict, Any
+import statistics as _statistics
 
 from ...utils.validators import (
     validate_timestamp,
@@ -29,11 +26,7 @@ from ...utils.validators import (
 )
 from ...core.database import Database
 
-# create Flask Blueprint for telemetry endpoints
 telemetry_bp = Blueprint('telemetry', __name__, url_prefix='/telemetry')
-
-# In-memory cache for backwards-compat with GET endpoints (supplements DB)
-MOCK_TELEMETRY: dict = {}
 
 # ================= HELPER FUNCTIONS ================= 
 
@@ -224,13 +217,7 @@ def submit_telemetry():
         if not valid_data:
             return jsonify({"error": f"Invalid telemetry data: {data_error}"}), 400
 
-        # Add metadata to telemetry entry
         current_time = datetime.utcnow().isoformat()
-        telemetry_entry = {
-            "timestamp": current_time,
-            "client_id": headers_client_id,
-            **data
-        }
 
         # Persist to database
         db = Database()
@@ -247,15 +234,9 @@ def submit_telemetry():
         finally:
             db.close()
 
-        # Keep in-memory copy for backwards-compat with GET endpoints
-        if headers_client_id not in MOCK_TELEMETRY:
-            MOCK_TELEMETRY[headers_client_id] = []
-        MOCK_TELEMETRY[headers_client_id].append(telemetry_entry)
-
-        # Generate acknowledgement I
         ack_id = generate_ack_id()
 
-        # Derive next_report_in from effective settings (fallback to 300)
+        # Derive next_report_in from effective settings (fallback to 300s)
         effective_interval = 300
         if pending_settings and isinstance(pending_settings.get("interval"), (int, float)):
             effective_interval = int(pending_settings["interval"])
@@ -282,221 +263,110 @@ def submit_telemetry():
 @telemetry_bp.route('/<client_id>', methods=['GET']) 
 # this should be a database query not an api endpoint
 def get_telemetry_history(client_id: str):
-    """
-    Retrieve telemetry history for a specific client.
-
-    Endpoint: GET /api/telemetry/<client_id>
-
-    Use Cases:
-    - Dashboard needs to graph CPU usage over time.
-    - Admin wants to analyze historical memory usage trends.
-    - Anomaly detection needs a baseline data set.
+    """Retrieve telemetry history for a client (HMAC authenticated).
 
     Query Parameters:
-        ?limit=N          # Limit to last N entries (default 100)
-        ?start=ISO-8601   # Start timestamp for filtering
-        ?end=ISO-8601     # End timestamp for filtering
-        ?metric=cpu,memory# Comma-separated list of metrics to include (cpu, memory, disk, network, processes)
-    
-    Response (success):
-    {
-        "client_id": "uuid",
-        "records": [
-            {
-            "timestamp": "ISO-8601",
-            "cpu_percent": float,
-            "memory_percent": float,
-            ...
-            },
-        ...
-        ],
-        "count": int,
-        "total_available": int
-    }
+        ?limit=N   — number of records to return (default 100)
     """
-
-    # validate request authentication
     valid, error_response, status_code = validate_telemetry_request(client_id)
     if not valid:
         return jsonify(error_response), status_code
-    
+
     try:
-        # Check if we have any telemetry for this client
-        if client_id not in MOCK_TELEMETRY:
-            return jsonify({
-                "client_id": client_id,
-                "records": [],
-                "count": 0,
-                "message": "No telemetry data found for this client."
-            }), 200
-        
-        # Get all telemetry records for the client
-        all_records = MOCK_TELEMETRY[client_id]
-
-        # Parse query parameters
         limit = request.args.get('limit', default=100, type=int)
-        since = request.args.get('start', default=None, type=str)
-        metrics_filter = request.args.get('metric', default=None, type=str)
+        db = Database()
+        try:
+            rows = db.get_client_telemetry(client_id, limit=limit)
+        finally:
+            db.close()
 
-        # Filter by timestamp if 'since' provided
-        if since:
-            # Filter records where timestamp is after since
-            # Note: we need to convert ISO-8601 timestamp back to UNIX for comparison
-            Filtered_records = [
-                r for r in all_records
-                if datetime.fromisoformat(r['timestamp'].rstrip('Z')).timestamp() > since
-            ]
-        else:
-            Filtered_records = all_records
-        
-        # Get the most recent 'limit' records
-        recent_records = Filtered_records[-limit:]
+        records = [
+            {"timestamp": r["timestamp"], **r["telemetry"]} for r in rows
+        ]
+        return jsonify({
+            "client_id": client_id,
+            "records": records,
+            "count": len(records),
+        }), 200
 
-        # Filter to specified metrics if requested
-        if metrics_filter:
-            requested_metrics = [m.strip() for m in metrics_filter.split(',')]
-            requested_metrics.append('timestamp') # Always include timestamp
-
-            # filter each record to only include requested metrics
-            recent_records = [
-                {k: v for k, v in record.items() if k in requested_metrics}
-                for record in recent_records
-            ]
-
-            # Return telemetry history
-            return jsonify({
-                "client_id": client_id,
-                "records": recent_records,
-                "count": len(recent_records),
-                "total_available": len(all_records)
-            }), 200
-        
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve telemetry: {str(e)}"}), 500
-    
+
+
 # ================= Get Latest Telemetry =================
 @telemetry_bp.route('/<client_id>/latest', methods=['GET'])
-def get_latest_telemetry(client_id: str): 
-    # use submit telemery endpoint func to receive data
-    # send request for data to client an wait for response then process save and display. do not disturb normal cycle
-    """
-    Get the most recent telemetry snapshot for a client
-
-    Endpoint: GET /api/telemetry/<client_id>/latest
-
-    Use Cases:
-    - Dashboard "Current Status" widget needs latest  metrics.
-    - Quick health check without fetching full history.
-    - Real-time monitoring display
-
-    Response (success):
-    {
-        "client_id": "uuid",
-        "timestamp": "ISO-8601",
-        "cpu_percent": float,
-        "memory_percent": float,
-        "disk_usage": float,
-        ...
-    }
-    """
-
-    # validate request authentication
+def get_latest_telemetry(client_id: str):
+    """Return the most recent telemetry snapshot for a client (HMAC authenticated)."""
     valid, error_response, status_code = validate_telemetry_request(client_id)
     if not valid:
         return jsonify(error_response), status_code
-    
-    try:
-        # Check if we have any telemetry for this client
-        if client_id not in MOCK_TELEMETRY or not MOCK_TELEMETRY[client_id]:
-            return jsonify({
-                "error": "No telemetry data found for this client."
-            }), 404
-        
-        latest_record = MOCK_TELEMETRY[client_id][-1]
 
-        return jsonify({latest_record}), 200
-    
+    try:
+        db = Database()
+        try:
+            row = db.get_latest_client_telemetry(client_id)
+        finally:
+            db.close()
+
+        if not row:
+            return jsonify({"error": "No telemetry data found for this client."}), 404
+
+        return jsonify({
+            "client_id": client_id,
+            "timestamp": row["timestamp"].isoformat() if hasattr(row["timestamp"], "isoformat") else row["timestamp"],
+            **row["telemetry"],
+        }), 200
+
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve latest telemetry: {str(e)}"}), 500
 
+
 # ================ Get Telemetry Stats ================
 @telemetry_bp.route('/<client_id>/stats', methods=['GET'])
-# should also be a database query not an api endpoint
 def get_telemetry_stats(client_id: str):
+    """Return statistical summary of a telemetry metric for a client (HMAC authenticated).
+
+    Query Parameters:
+        ?metric=cpu_percent   — metric field name (default: cpu_percent)
+        ?limit=100            — number of recent records to include (default: 100)
     """
-    Get Statical summaries of telemetry data for a client.
-    
-    Endpoint: GET /api/telemetry/<client_id>/stats
-
-    Use Cases:
-    - Dashboard "average CPU Usage" over time.
-    - Detect anomalies (current value vs average)
-    - Percentiles (95th percentile network usage)
-
-    Response (success):
-    {
-        "metric": "cpu_percent",
-        "period": seconds,
-        "sample_count": int,
-        "min": float,
-        "max": float,
-        "avg": float,
-        "median": float,
-        "percentile_95": float
-    }
-    """
-
-    # validate request authentication
     valid, error_response, status_code = validate_telemetry_request(client_id)
     if not valid:
         return jsonify(error_response), status_code
-    
+
     try:
-        # Check if we have telemetry for this client
-        if client_id not in MOCK_TELEMETRY or not MOCK_TELEMETRY[client_id]:
-            return jsonify({"error": "No telemetry data found for this client."}), 404
-        
-        # Get query parameters
         metric = request.args.get('metric', default='cpu_percent', type=str)
-        period = request.args.get('period', default=3600, type=int) # default 1 hour
+        limit = request.args.get('limit', default=100, type=int)
 
-        current_time = time.time()
-        cutoff_time = current_time - period # UNIX timestamp
+        db = Database()
+        try:
+            rows = db.get_client_telemetry(client_id, limit=limit)
+        finally:
+            db.close()
 
-        records = MOCK_TELEMETRY[client_id]
-        recent_records = [
-            r for r in records
-            if datetime.fromisoformat(r['timestamp'].rstrip('Z')).timestamp() >= cutoff_time
+        values = [
+            r["telemetry"][metric]
+            for r in rows
+            if isinstance(r.get("telemetry"), dict) and r["telemetry"].get(metric) is not None
         ]
 
-        # Extract metric values
-        values = [r.get(metric) for r in recent_records if metric in r and r[metric] is not None]
-
         if not values:
-            return jsonify({"error": f"No data for metric '{metric}' in the specified period."}), 404
-        
-        # Calculate statistics
-        import statistics # python built-in statistics module
+            return jsonify({"error": f"No data for metric '{metric}'."}), 404
 
-        stats = {
+        result = {
             "metric": metric,
-            "period": period,
             "sample_count": len(values),
             "min": round(min(values), 2),
             "max": round(max(values), 2),
-            "avg": round(statistics.mean(values), 2),
-            "median": round(statistics.median(values), 2),
+            "avg": round(_statistics.mean(values), 2),
+            "median": round(_statistics.median(values), 2),
         }
-
-        # Calculate 95th percentile
         if len(values) >= 10:
             sorted_values = sorted(values)
-            # index for 95th percentile
-            percentile_index = int(len(sorted_values) * 0.95)
-            stats["percentile_95"] = round(sorted_values[percentile_index], 2)
+            result["percentile_95"] = round(sorted_values[int(len(sorted_values) * 0.95)], 2)
 
-        return jsonify(stats), 200
-    
+        return jsonify(result), 200
+
     except Exception as e:
         return jsonify({"error": f"Failed to calculate telemetry stats: {str(e)}"}), 500
 
@@ -505,12 +375,9 @@ def get_telemetry_stats(client_id: str):
 
 @telemetry_bp.route('/web/<client_id>/history', methods=['GET'])
 def web_client_telemetry(client_id):
-    """
-    Return recent telemetry history for a specific client (web UI use).
+    """Return recent telemetry history for a client (web session authenticated).
 
-    Endpoint: GET /api/telemetry/web/<client_id>/history?limit=50
-
-    Requires a valid web session (not client HMAC auth).
+    Endpoint: GET /api/v1/telemetry/web/<client_id>/history?limit=50
     Returns records in chronological order (oldest first).
     """
     from flask import session as web_session
@@ -520,7 +387,7 @@ def web_client_telemetry(client_id):
     db = Database()
     try:
         rows = db.get_client_telemetry(client_id, limit=limit)
-        # db returns newest-first; reverse for chronological display
+        # DB returns newest-first; reverse for chronological chart display
         rows = list(reversed(rows))
         return jsonify({'telemetry': rows, 'client_id': client_id})
     finally:
