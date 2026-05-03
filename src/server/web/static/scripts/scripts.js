@@ -310,7 +310,7 @@ function initializeDemoSettings() {
         const payload = { demo_mode: enabled };
         if (!isNaN(alertRate) && alertRate > 0) payload.demo_alerts_per_hour = alertRate;
 
-        fetch('/api/demo/push', {
+        fetch('/api/v1/demo/push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -337,12 +337,72 @@ function initializeDemoSettings() {
     });
 }
 
-function refreshDemoStatus() {
+function pushIntervalToAllClients() {
+    const input = document.getElementById('heartbeatInterval');
+    const feedback = document.getElementById('intervalFeedback');
+    const minutes = parseInt(input?.value, 10);
+
+    if (isNaN(minutes) || minutes < 1 || minutes > 60) {
+        if (feedback) { feedback.textContent = 'Invalid interval (1–60 minutes).'; feedback.style.color = 'var(--error-color, #e74c3c)'; }
+        return;
+    }
+
+    if (feedback) { feedback.textContent = 'Pushing…'; feedback.style.color = 'var(--text-secondary)'; }
+
+    fetch('/api/v1/clients/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_ids: 'all', settings: { interval: minutes * 60 } }),
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (feedback) {
+                feedback.textContent = data.message || 'Done.';
+                feedback.style.color = 'var(--success-color, #27ae60)';
+                setTimeout(() => { feedback.textContent = ''; }, 4000);
+            }
+        })
+        .catch(() => {
+            if (feedback) { feedback.textContent = 'Request failed.'; feedback.style.color = 'var(--error-color, #e74c3c)'; }
+        });
+}
+
+function pushDemoAlertRate() {
+    const rateInput = document.getElementById('demoAlertRate');
+    const feedback = document.getElementById('demoFeedback');
+    const rate = parseInt(rateInput?.value, 10);
+
+    if (isNaN(rate) || rate < 1) {
+        if (feedback) { feedback.textContent = 'Invalid rate.'; feedback.style.color = 'var(--error-color, #e74c3c)'; }
+        return;
+    }
+
+    if (feedback) { feedback.textContent = 'Applying…'; feedback.style.color = 'var(--text-secondary)'; }
+
+    fetch('/api/v1/demo/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ demo_alerts_per_hour: rate }),
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (feedback) {
+                feedback.textContent = data.status === 'ok' ? `Alert rate set to ${rate}/hr for ${data.queued} client(s).` : (data.error || 'Failed.');
+                feedback.style.color = data.status === 'ok' ? 'var(--success-color, #27ae60)' : 'var(--error-color, #e74c3c)';
+                setTimeout(() => { feedback.textContent = ''; }, 4000);
+            }
+        })
+        .catch(() => {
+            if (feedback) { feedback.textContent = 'Request failed.'; feedback.style.color = 'var(--error-color, #e74c3c)'; }
+        });
+}
+
+
     const statusText = document.getElementById('demoStatusText');
     const toggle = document.getElementById('demoModeToggle');
     if (!statusText || !toggle) return;
 
-    fetch('/api/demo/status')
+    fetch('/api/v1/demo/status')
         .then(r => r.json())
         .then(data => {
             if (data.error) {
@@ -640,7 +700,7 @@ let _lastAlertCount = -1; // -1 = not yet known
 
 function pollAlertCount() {
     function fetchCount() {
-        fetch('/api/web/alerts/count')
+        fetch('/api/v1/web/alerts/count')
             .then(r => r.ok ? r.json() : null)
             .then(data => {
                 if (!data) return;
@@ -681,7 +741,7 @@ function initAlerts(preselectedId) {
 }
 
 function loadAlerts() {
-    return fetch('/api/web/alerts?limit=500')
+    return fetch('/api/v1/web/alerts?limit=500')
         .then(r => r.ok ? r.json() : { alerts: [] })
         .then(data => {
             _allAlerts = data.alerts || [];
@@ -824,7 +884,7 @@ function selectAlert(alertId) {
 }
 
 function acknowledgeAlert(alertId) {
-    fetch(`/api/web/alerts/${alertId}/acknowledge`, { method: 'POST' })
+    fetch(`/api/v1/web/alerts/${alertId}/acknowledge`, { method: 'POST' })
         .then(r => r.json())
         .then(data => {
             if (data.error) { alert('Error: ' + data.error); return; }
@@ -835,7 +895,7 @@ function acknowledgeAlert(alertId) {
 }
 
 function resolveAlert(alertId) {
-    fetch(`/api/web/alerts/${alertId}/resolve`, { method: 'POST' })
+    fetch(`/api/v1/web/alerts/${alertId}/resolve`, { method: 'POST' })
         .then(r => r.json())
         .then(data => {
             if (data.error) { alert('Error: ' + data.error); return; }
@@ -915,7 +975,7 @@ function showAlertToast(alert) {
 
     const ackBtn = toast.querySelector('.alert-toast-btn-ack');
     if (ackBtn) ackBtn.addEventListener('click', () => {
-        fetch(`/api/web/alerts/${id}/acknowledge`, { method: 'POST' })
+        fetch(`/api/v1/web/alerts/${id}/acknowledge`, { method: 'POST' })
             .then(r => r.ok ? r.json() : null)
             .then(() => _dismissToast(toast))
             .catch(() => {});
@@ -923,7 +983,7 @@ function showAlertToast(alert) {
 
     const resBtn = toast.querySelector('.alert-toast-btn-resolve');
     if (resBtn) resBtn.addEventListener('click', () => {
-        fetch(`/api/web/alerts/${id}/resolve`, { method: 'POST' })
+        fetch(`/api/v1/web/alerts/${id}/resolve`, { method: 'POST' })
             .then(r => r.ok ? r.json() : null)
             .then(() => _dismissToast(toast))
             .catch(() => {});
@@ -945,7 +1005,7 @@ function _dismissToast(toast) {
 
 function pollCriticalAlerts() {
     function fetchCritical() {
-        fetch('/api/web/alerts?severity=critical&status=unresolved&limit=20')
+        fetch('/api/v1/web/alerts?severity=critical&status=unresolved&limit=20')
             .then(r => r.ok ? r.json() : { alerts: [] })
             .then(data => {
                 const now = Date.now();
@@ -995,7 +1055,7 @@ function pollDashboardTiles() {
     };
 
     function updateTiles() {
-        fetch('/api/web/dashboard/tiles')
+        fetch('/api/v1/web/dashboard/tiles')
             .then(r => r.ok ? r.json() : null)
             .then(data => {
                 if (!data) return;

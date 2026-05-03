@@ -49,10 +49,12 @@ def render_client_settings():
             <div class="setting-label">Telemetry Report Interval (minutes)</div>
             <div class="setting-description">How often clients collect and send telemetry data to the server. Default is 5 minutes.</div>
         </div>
-        <div class="setting-control">
+        <div class="setting-control" style="gap: 0.5rem; display: flex; align-items: center;">
             <input type="number" class="settings-number-input" value="5" min="1" max="60" id="heartbeatInterval">
+            <button class="settings-btn settings-btn-primary" onclick="pushIntervalToAllClients()">Push to All Clients</button>
         </div>
     </div>
+    <span class="settings-feedback" id="intervalFeedback"></span>
     <div class="setting-item">
         <div class="setting-info">
             <div class="setting-label">Connection Timeout</div>
@@ -118,10 +120,11 @@ def render_demo_settings():
                     Number of synthetic alerts submitted per hour while demo mode is active.
                 </div>
             </div>
-            <div class="setting-control">
+            <div class="setting-control" style="gap: 0.5rem; display: flex; align-items: center;">
                 <input type="number" id="demoAlertRate" class="settings-number-input"
                        min="1" max="120" value="20">
                 <span class="setting-description">/ hr</span>
+                <button class="settings-btn settings-btn-secondary" onclick="pushDemoAlertRate()">Apply Rate</button>
             </div>
         </div>
         <div class="setting-item">
