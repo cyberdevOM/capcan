@@ -11,6 +11,18 @@ def _require_session():
     return None
 
 
+def _get_session_role():
+    """Return the role of the currently logged-in web user, or None."""
+    if not session.get('user_id'):
+        return None
+    db = Database()
+    try:
+        user = db.get_web_user_by_id(session['user_id']) or {}
+        return user.get('role', 'read-only')
+    finally:
+        db.close()
+
+
 @web_alerts_bp.route('', methods=['GET'])
 def web_alerts():
     err = _require_session()
@@ -49,6 +61,9 @@ def web_alerts_count():
 def web_acknowledge_alert(alert_id):
     err = _require_session()
     if err: return err
+    role = _get_session_role()
+    if role == 'read-only':
+        return jsonify({'error': 'Read-only users cannot acknowledge alerts'}), 403
     db = Database()
     try:
         user = db.get_web_user_by_id(session['user_id']) or {}
@@ -64,6 +79,9 @@ def web_acknowledge_alert(alert_id):
 def web_resolve_alert(alert_id):
     err = _require_session()
     if err: return err
+    role = _get_session_role()
+    if role == 'read-only':
+        return jsonify({'error': 'Read-only users cannot resolve alerts'}), 403
     db = Database()
     try:
         ok = db.resolve_alert(alert_id)

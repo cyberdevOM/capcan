@@ -824,8 +824,11 @@ function selectAlert(alertId) {
             </div>`;
     }
 
-    const canAck  = alert.status === 'unresolved';
-    const canRes  = alert.status === 'acknowledged'; // must acknowledge first
+    const _role = window.CAPCAN_USER_ROLE || 'read-only';
+    const _canAct = _role !== 'read-only';
+
+    const canAck  = _canAct && alert.status === 'unresolved';
+    const canRes  = _canAct && alert.status === 'acknowledged'; // must acknowledge first
 
     panel.innerHTML = `
         <div class="alert-detail-header">

@@ -33,7 +33,7 @@ class Config:
             "ALERT_SEVERITY": "CREATE TYPE ALERT_SEVERITY AS ENUM ('critical', 'high','medium','low', 'info', 'undefined');",
             "ALERT_STATUS": "CREATE TYPE ALERT_STATUS AS ENUM ('unresolved', 'acknowledged', 'resolved');",
             "CHANGE_STATUS": "CREATE TYPE CHANGE_STATUS AS ENUM ('active', 'inactive', 'pending', 'approved', 'rejected');",
-            "ROLE": "CREATE TYPE ROLE AS ENUM ('admin', 'analyst', 'read-only');"
+            "ROLE": "CREATE TYPE ROLE AS ENUM ('super-admin', 'admin', 'analyst', 'read-only');"
         }
         try:
             for enum_name, query in enums.items():

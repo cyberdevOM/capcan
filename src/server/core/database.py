@@ -51,15 +51,19 @@ class Database:
     # ============== WEB USER MANAGEMENT ==============
     # Role to permissions mapping
     ROLE_PERMISSIONS = {
-        'admin': ['ALL'],
-        'analyst': ['READ', 'VIEW', 'WRITE', 'MANAGE'],
-        'read-only': ['READ', 'VIEW']
+        'super-admin': ['ALL'],
+        'admin':       ['ALL'],
+        'analyst':     ['READ', 'VIEW', 'WRITE', 'MANAGE'],
+        'read-only':   ['READ', 'VIEW'],
     }
+
+    # Roles that grant admin-level access
+    _ADMIN_ROLES = frozenset({'super-admin', 'admin'})
 
     def create_web_user(self, username, pass_hash, email, role='read-only'):
         user_id = str(uuid.uuid4())
         permissions = self.ROLE_PERMISSIONS.get(role, ['READ', 'VIEW'])
-        is_admin = (role == 'admin')
+        is_admin = role in self._ADMIN_ROLES
         try:
             self.cursor.execute(
                 "INSERT INTO auth (user_id, username, pass_hash) VALUES (%s, %s, %s);",
@@ -86,8 +90,37 @@ class Database:
                 self.conn.rollback()
             print(f"Failed to create user permissions for '{username}'.")
 
+    def migrate_role_enum(self):
+        """Ensure 'super-admin' exists in the PostgreSQL ROLE enum.
+
+        ALTER TYPE ADD VALUE cannot run inside a transaction block, so we
+        commit any pending work, switch to autocommit, run the DDL, then
+        restore the previous autocommit setting.
+        """
+        try:
+            self.cursor.execute(
+                "SELECT 1 FROM pg_enum e "
+                "JOIN pg_type t ON e.enumtypid = t.oid "
+                "WHERE t.typname = 'role' AND e.enumlabel = 'super-admin'"
+            )
+            if self.cursor.fetchone():
+                return  # already present — nothing to do
+            self.conn.commit()
+            self.conn.autocommit = True
+            self.cursor.execute("ALTER TYPE ROLE ADD VALUE 'super-admin'")
+            self.conn.autocommit = False
+            print("ROLE enum: 'super-admin' value added.")
+        except Exception as error:
+            print(f"migrate_role_enum error: {error}")
+            try:
+                self.conn.autocommit = False
+                self.conn.rollback()
+            except Exception:
+                pass
+
     def create_default_web_user(self):
         load_env()
+        self.migrate_role_enum()
         default_username = os.getenv("WEB_DEFAULT_USER")
         default_password = os.getenv("WEB_DEFAULT_PASSWORD")
         default_email = os.getenv("WEB_DEFAULT_EMAIL")
@@ -98,8 +131,7 @@ class Database:
             client_hash = pre_hash_client_password(default_password)
             pass_hash = hash_password(client_hash)
             try:
-                # Default user is always admin with all permissions
-                self.create_web_user(default_username, pass_hash, default_email, role='admin')
+                self.create_web_user(default_username, pass_hash, default_email, role='super-admin')
             except (psycopg2.DatabaseError, Exception) as error:
                 print(error)
                 if self.conn:
@@ -109,7 +141,33 @@ class Database:
             print(f"Default web user '{default_username}' already exists or environment variables are not set.")
 
     def update_web_user(self, user_id, email=None, display_name=None, role=None, permissions=None):
-        pass  # update web user information in the database, used for user management and role/permission updates
+        try:
+            if role is not None:
+                new_permissions = self.ROLE_PERMISSIONS.get(role, ['READ', 'VIEW'])
+                is_admin = role in self._ADMIN_ROLES
+                self.cursor.execute(
+                    "UPDATE user_permissions SET role = %s, permissions = %s, is_admin = %s WHERE user_id = %s",
+                    (role, new_permissions, is_admin, user_id)
+                )
+            if email is not None:
+                self.cursor.execute(
+                    "UPDATE user_permissions SET email = %s WHERE user_id = %s",
+                    (email, user_id)
+                )
+            if display_name is not None:
+                self.cursor.execute(
+                    "UPDATE user_permissions SET display_name = %s WHERE user_id = %s",
+                    (display_name, user_id)
+                )
+            self.conn.commit()
+            print(f"Web user '{user_id}' updated successfully.")
+            return True
+        except (psycopg2.DatabaseError, Exception) as error:
+            print(error)
+            if self.conn:
+                self.conn.rollback()
+            print(f"Failed to update web user '{user_id}'.")
+            return False
 
     def delete_web_user(self, user_id):
         try:

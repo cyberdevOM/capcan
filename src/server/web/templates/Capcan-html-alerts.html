@@ -53,6 +53,7 @@
 
 {% block scripts %}
 <script>
+    window.CAPCAN_USER_ROLE = '{{ user_role | default("read-only") }}';
     document.addEventListener('DOMContentLoaded', () => initAlerts('{{ preselected_alert | default("") }}'));
 </script>
 {% endblock %}

@@ -22,12 +22,14 @@
             </button>
         </div>
         <div class="client-action-bar">
+            {% if user_role in ('admin', 'super-admin') %}
             <button class="client-action-btn add-btn" onclick="openAddClientModal()">
                 <i class="fas fa-plus"></i> Add
             </button>
             <button class="client-action-btn delete-btn" id="deleteClientBtn" onclick="openDeleteClientModal()" disabled>
                 <i class="fas fa-trash"></i> Remove
             </button>
+            {% endif %}
         </div>
         <div class="clients" id="clientsList">
             {{ client_list_html | safe }}
@@ -38,6 +40,7 @@
     </section>
 </div>
 
+{% if user_role in ('admin', 'super-admin') %}
 <!-- Add Client Modal -->
 <div class="modal-overlay" id="addClientModal">
     <div class="modal">
@@ -95,7 +98,12 @@
     </div>
 </div>
 
+{% endif %}
+
 {% block scripts %}
+<script>
+    window.CAPCAN_USER_ROLE = '{{ user_role | default("read-only") }}';
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='scripts/clients.js') }}"></script>
 {% endblock %}

@@ -16,25 +16,29 @@
                 <i class="fas fa-user settings-nav-icon"></i>
                 <span>Account</span>
             </li>
+            {% if user_role in ('admin', 'super-admin') %}
             <li class="settings-nav-item" data-panel="clients">
                 <i class="fas fa-server settings-nav-icon"></i>
                 <span>Clients</span>
             </li>
+            {% endif %}
+            {% if user_role != 'read-only' %}
             <li class="settings-nav-item" data-panel="configs">
                 <i class="fas fa-file-code settings-nav-icon"></i>
                 <span>Configs</span>
             </li>
+            {% endif %}
             <li class="settings-nav-item" data-panel="web">
                 <i class="fas fa-globe settings-nav-icon"></i>
                 <span>Web</span>
             </li>
-            {% if user_role == 'admin' %}
+            {% if user_role in ('admin', 'super-admin') %}
             <li class="settings-nav-item" data-panel="users">
                 <i class="fas fa-users-cog settings-nav-icon"></i>
                 <span>Users</span>
             </li>
             {% endif %}
-            {% if demo_mode and user_role == 'admin' %}
+            {% if demo_mode and user_role in ('admin', 'super-admin') %}
             <li class="settings-nav-item settings-nav-item--demo" data-panel="demo">
                 <i class="fas fa-flask settings-nav-icon"></i>
                 <span>Demo</span>
@@ -84,36 +88,40 @@
             </div>
         </div>
 
-        <!-- Clients panel -->
+        {% if user_role in ('admin', 'super-admin') %}
+        <!-- Clients panel — admin and super-admin only -->
         <div class="settings-panel" id="panel-clients">
             <h2 class="settings-panel-title">Clients</h2>
             <div class="settings-section">
                 {{ client_settings_html }}
             </div>
         </div>
+        {% endif %}
 
-        <!-- Configs panel -->
+        {% if user_role != 'read-only' %}
+        <!-- Configs panel — admin, super-admin, and analyst -->
         <div class="settings-panel" id="panel-configs">
             <h2 class="settings-panel-title">Configs</h2>
             {{ configs_settings_html }}
         </div>
+        {% endif %}
 
-        <!-- Web panel -->
+        <!-- Web panel — personal appearance settings, available to all users -->
         <div class="settings-panel" id="panel-web">
             <h2 class="settings-panel-title">Web</h2>
             {{ web_settings_html }}
         </div>
 
-        {% if user_role == 'admin' %}
-        <!-- Users panel — admin only -->
+        {% if user_role in ('admin', 'super-admin') %}
+        <!-- Users panel — admin and super-admin only -->
         <div class="settings-panel" id="panel-users">
             <h2 class="settings-panel-title">Users</h2>
             <div class="settings-section">
                 <div class="settings-section-header">
                     <h3 class="settings-section-title">Manage Users</h3>
-                    <a href="{{ url_for('Register') }}" class="settings-btn settings-btn-primary">
+                    <button class="settings-btn settings-btn-primary" onclick="openAddUserModal()">
                         <i class="fas fa-plus"></i> Add User
-                    </a>
+                    </button>
                 </div>
                 <div class="users-table-wrapper">
                     <table class="users-table">
@@ -124,15 +132,19 @@
                                 <th>Role</th>
                                 <th>Active</th>
                                 <th>Created</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for user in users_list %}
+                            {% set is_self = user.user_id == current_user.user_id %}
+                            {% set is_super = user.role == 'super-admin' %}
+                            {% set is_editable = not is_self and not is_super and (user_role == 'super-admin' or user.role != 'admin') %}
                             <tr>
                                 <td>{{ user.display_name }}</td>
                                 <td>{{ user.email }}</td>
                                 <td>
-                                    <span class="role-badge role-{{ user.role | replace('-', '') }}">
+                                    <span class="role-badge role-{{ user.role | replace('-', '') }}" id="role-badge-{{ user.user_id }}">
                                         {{ user.role }}
                                     </span>
                                 </td>
@@ -140,10 +152,30 @@
                                     <span class="status-dot {% if user.is_active %}status-active{% else %}status-inactive{% endif %}"></span>
                                 </td>
                                 <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else '—' }}</td>
+                                <td>
+                                    {% if is_editable %}
+                                    <div class="user-role-edit">
+                                        <select class="settings-select" id="role-select-{{ user.user_id }}">
+                                            {% if user_role == 'super-admin' %}
+                                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                                            {% endif %}
+                                            <option value="analyst" {% if user.role == 'analyst' %}selected{% endif %}>Analyst</option>
+                                            <option value="read-only" {% if user.role == 'read-only' %}selected{% endif %}>Read-only</option>
+                                        </select>
+                                        <button class="settings-btn settings-btn-primary settings-btn-sm"
+                                                onclick="saveUserRole('{{ user.user_id }}')">Save</button>
+                                        <span class="user-role-feedback" id="role-feedback-{{ user.user_id }}"></span>
+                                    </div>
+                                    {% else %}
+                                    <span class="user-lock-icon" title="{% if is_self %}Cannot edit your own role{% elif is_super %}Cannot edit the owner account{% else %}Cannot edit admin users{% endif %}">
+                                        <i class="fas fa-lock"></i>
+                                    </span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="5" class="empty-state">No users found.</td>
+                                <td colspan="6" class="empty-state">No users found.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -153,8 +185,8 @@
         </div>
         {% endif %}
 
-        {% if demo_mode and user_role == 'admin' %}
-        <!-- Demo panel — only visible when server started with --demo and user is admin -->
+        {% if demo_mode and user_role in ('admin', 'super-admin') %}
+        <!-- Demo panel — only visible when server started with --demo and user is admin/super-admin -->
         <div class="settings-panel" id="panel-demo">
             <h2 class="settings-panel-title">
                 Demo
@@ -168,5 +200,77 @@
 
     </div><!-- /settings-content -->
 </div><!-- /settings-layout -->
+
+<!-- ── Add User Modal ── -->
+<div class="modal-overlay" id="addUserModal" onclick="handleAddUserOverlayClick(event)">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="addUserModalTitle">
+        <div class="modal-header">
+            <h3 class="modal-title" id="addUserModalTitle">
+                <i class="fas fa-user-plus"></i> Add User
+            </h3>
+            <button class="modal-close" onclick="closeAddUserModal()" title="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-field">
+                <label class="modal-label" for="modal-username">Username</label>
+                <input type="text" id="modal-username" class="settings-text-input modal-input"
+                       placeholder="Enter username" autocomplete="off">
+                <span class="modal-field-error" id="modal-username-error"></span>
+            </div>
+            <div class="modal-field">
+                <label class="modal-label" for="modal-email">Email</label>
+                <input type="email" id="modal-email" class="settings-text-input modal-input"
+                       placeholder="Enter email address" autocomplete="off">
+                <span class="modal-field-error" id="modal-email-error"></span>
+            </div>
+            <div class="modal-field">
+                <label class="modal-label" for="modal-password">Password</label>
+                <div class="modal-password-wrap">
+                    <input type="password" id="modal-password" class="settings-text-input modal-input"
+                           placeholder="Enter password">
+                    <button type="button" class="modal-toggle-pw" data-target="modal-password" title="Show/hide password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <span class="modal-field-error" id="modal-password-error"></span>
+            </div>
+            <div class="modal-field">
+                <label class="modal-label" for="modal-confirm">Confirm Password</label>
+                <div class="modal-password-wrap">
+                    <input type="password" id="modal-confirm" class="settings-text-input modal-input"
+                           placeholder="Confirm password">
+                    <button type="button" class="modal-toggle-pw" data-target="modal-confirm" title="Show/hide password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <span class="modal-field-error" id="modal-confirm-error"></span>
+            </div>
+            <div class="modal-field">
+                <label class="modal-label" for="modal-role">Role</label>
+                <select id="modal-role" class="settings-select modal-select">
+                    <option value="read-only" selected>Read-only</option>
+                    <option value="analyst">Analyst</option>
+                    {% if user_role == 'super-admin' %}
+                    <option value="admin">Admin</option>
+                    {% endif %}
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <span class="modal-feedback" id="modal-feedback"></span>
+            <div class="modal-footer-btns">
+                <button class="settings-btn settings-btn-secondary" onclick="closeAddUserModal()">Cancel</button>
+                <button class="settings-btn settings-btn-primary" id="addUserSubmitBtn" onclick="submitAddUser()">
+                    Create User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
+{% block scripts %}
+<script src="{{ url_for('static', filename='scripts/bcrypt.js') }}"></script>
+<script src="{{ url_for('static', filename='scripts/settings.js') }}"></script>
+{% endblock %}

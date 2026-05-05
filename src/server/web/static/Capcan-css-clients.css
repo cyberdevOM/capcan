@@ -1033,7 +1033,7 @@
 .panel-alert-actions {
     display: flex;
     align-items: center;
-    padding: 0 0.4rem;
+    padding: 0 0.8rem;
     flex-shrink: 0;
 }
 

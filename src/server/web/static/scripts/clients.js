@@ -6,7 +6,8 @@ const _chartInstances = {};
 function selectClient(clientId) {
     _activeClientId = clientId;
     _activeClientName = document.querySelector(`.client-item[data-client-id="${clientId}"] .client-id`)?.textContent || clientId;
-    document.getElementById('deleteClientBtn').disabled = false;
+    const deleteBtn = document.getElementById('deleteClientBtn');
+    if (deleteBtn) deleteBtn.disabled = false;
 
     // Card click = exclusive single select; check only this client's checkbox
     document.querySelectorAll('.client-select').forEach(el => { el.checked = el.value === clientId; });
@@ -227,10 +228,13 @@ function _renderPanelAlertItem(a, clientId) {
         ? `<span class="panel-alert-score" title="Risk score">${Math.round(a.score)}</span>`
         : '';
 
-    const ackBtn = a.status === 'unresolved'
+    const _role = window.CAPCAN_USER_ROLE || 'read-only';
+    const _canAct = _role !== 'read-only';
+
+    const ackBtn = (_canAct && a.status === 'unresolved')
         ? `<button class="panel-alert-btn" title="Acknowledge" onclick="ackPanelAlert('${a.alert_id}','${clientId}')"><i class="fas fa-check"></i></button>`
         : '';
-    const resBtn = a.status !== 'resolved'
+    const resBtn = (_canAct && a.status === 'acknowledged')
         ? `<button class="panel-alert-btn resolve" title="Resolve" onclick="resolvePanelAlert('${a.alert_id}','${clientId}')"><i class="fas fa-times"></i></button>`
         : '';
 

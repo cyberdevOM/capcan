@@ -26,9 +26,11 @@ def _collect_toggle(client_id: str, key: str, label: str, effective: dict) -> st
     )
 
 
-def render_client_list():
+def render_client_list(user_role='read-only'):
     """Render the complete client list with multi-select checkboxes."""
     clients = _fetch_clients()
+    can_manage = user_role in ('admin', 'super-admin')
+    can_config = user_role in ('admin', 'super-admin', 'analyst')
 
     if not clients:
         return Markup("""
@@ -38,7 +40,8 @@ def render_client_list():
         </div>
         """)
 
-    header = """
+    if can_config:
+        header = """
     <div class="client-list-header">
         <label class="select-all-label">
             <input type="checkbox" id="select-all-clients" onchange="toggleSelectAll(this)">
@@ -49,6 +52,8 @@ def render_client_list():
         </button>
     </div>
     """
+    else:
+        header = ""
 
     html = header
     for c in clients:
@@ -59,12 +64,14 @@ def render_client_list():
         os_label = (c.get('client_os') or 'Unknown').title()
         ip_label = c.get('ip_address') or ''
         platform_line = f"{os_label}" + (f" &bull; {ip_label}" if ip_label else "")
+        checkbox_html = (
+            f'<label class="client-checkbox" onclick="event.stopPropagation()">'
+            f'<input type="checkbox" class="client-select" value="{cid}"'
+            f' onchange="onClientCheckboxChange()"></label>'
+        ) if can_config else ''
         html += f"""
         <div class="client-item" data-client-id="{cid}" onclick="selectClient('{cid}')">
-            <label class="client-checkbox" onclick="event.stopPropagation()">
-                <input type="checkbox" class="client-select" value="{cid}"
-                       onchange="onClientCheckboxChange()">
-            </label>
+            {checkbox_html}
             <div class="client-status">
                 <span class="status-dot {status}"></span>
             </div>
@@ -84,7 +91,7 @@ def render_client_list():
     return Markup(html)
 
 
-def render_client_details(client_id=None):
+def render_client_details(client_id=None, user_role='read-only'):
     """Render client details panel, optionally with latest telemetry."""
     if not client_id:
         return Markup("""
@@ -163,7 +170,11 @@ def render_client_details(client_id=None):
         stat_card("fas fa-tasks", "Processes", procs)
     )
 
-    config_html = f"""
+    can_config = user_role in ('admin', 'super-admin', 'analyst')
+    can_act = user_role in ('admin', 'super-admin')
+
+    if can_config:
+        config_html = f"""
     <div class="config-form" id="config-form-{cid}">
         <div class="config-row">
             <label class="config-label">Report interval (minutes)</label>
@@ -193,6 +204,33 @@ def render_client_details(client_id=None):
         </div>
         <div class="config-status" id="cfg-status-{cid}"></div>
     </div>"""
+    else:
+        config_html = ""
+
+    action_buttons_html = ""
+    if can_act:
+        action_buttons_html = f"""
+                <button class="control-btn secondary" onclick="showLogs('{cid}')">
+                    <i class="fas fa-file-alt"></i> Logs
+                </button>
+                <button class="control-btn primary" onclick="connectClient('{cid}')">
+                    <i class="fas fa-plug"></i> Connect
+                </button>"""
+
+    config_section_html = ""
+    if can_config:
+        config_section_html = f"""
+                <div class="panel-config-section">
+                    <button class="panel-config-toggle" onclick="togglePanelConfig('{cid}')">
+                        <i class="fas fa-sliders-h"></i>
+                        Remote Settings
+                        {pending_badge}
+                        <i class="fas fa-chevron-down panel-config-chevron" id="cfg-chevron-{cid}"></i>
+                    </button>
+                    <div class="panel-config-body" id="cfg-body-{cid}">
+                        {config_html}
+                    </div>
+                </div>"""
 
     html = f"""
     <div class="client-panel" data-client-id="{cid}">
@@ -210,12 +248,7 @@ def render_client_details(client_id=None):
                 </span>
             </div>
             <div class="panel-header-actions">
-                <button class="control-btn secondary" onclick="showLogs('{cid}')">
-                    <i class="fas fa-file-alt"></i> Logs
-                </button>
-                <button class="control-btn primary" onclick="connectClient('{cid}')">
-                    <i class="fas fa-plug"></i> Connect
-                </button>
+                {action_buttons_html}
             </div>
         </div>
 
@@ -261,17 +294,7 @@ def render_client_details(client_id=None):
                     </div>
                 </div>
 
-                <div class="panel-config-section">
-                    <button class="panel-config-toggle" onclick="togglePanelConfig('{cid}')">
-                        <i class="fas fa-sliders-h"></i>
-                        Remote Settings
-                        {pending_badge}
-                        <i class="fas fa-chevron-down panel-config-chevron" id="cfg-chevron-{cid}"></i>
-                    </button>
-                    <div class="panel-config-body" id="cfg-body-{cid}">
-                        {config_html}
-                    </div>
-                </div>
+                {config_section_html}
 
             </div>
 

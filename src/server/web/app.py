@@ -59,10 +59,17 @@ def Dashboard():
 def Clients():
     if not session.get('user_id'):
         return redirect('/login')
+    db = Database()
+    try:
+        current_user = db.get_web_user_by_id(session['user_id']) or {}
+        user_role = current_user.get('role', 'read-only')
+    finally:
+        db.close()
     client_id = request.args.get('client_id')
     context = {
-        'client_list_html': clients_prerender.render_client_list(),
-        'client_details_html': clients_prerender.render_client_details(client_id),
+        'client_list_html': clients_prerender.render_client_list(user_role),
+        'client_details_html': clients_prerender.render_client_details(client_id, user_role),
+        'user_role': user_role,
     }
     return render_template(
         'Capcan-html-clients.html',
@@ -78,7 +85,7 @@ def Settings():
     try:
         current_user = db.get_web_user_by_id(session['user_id']) or {}
         user_role = current_user.get('role', 'read-only')
-        users_list = db.get_all_web_users() if user_role == 'admin' else []
+        users_list = db.get_all_web_users() if user_role in ('admin', 'super-admin') else []
     finally:
         db.close()
 
@@ -110,8 +117,14 @@ def Register():
 def Alerts():
     if not session.get('user_id'):
         return redirect(url_for('Login'))
+    db = Database()
+    try:
+        current_user = db.get_web_user_by_id(session['user_id']) or {}
+        user_role = current_user.get('role', 'read-only')
+    finally:
+        db.close()
     selected_id = request.args.get('selected', '')
-    return render_template('Capcan-html-alerts.html', preselected_alert=selected_id)
+    return render_template('Capcan-html-alerts.html', preselected_alert=selected_id, user_role=user_role)
 
 
 # if __name__ == '__main__':

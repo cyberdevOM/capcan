@@ -14,7 +14,7 @@ def demo_status():
     db = Database()
     try:
         current_user = db.get_web_user_by_id(session['user_id']) or {}
-        if current_user.get('role') != 'admin':
+        if current_user.get('role') not in ('admin', 'super-admin'):
             return jsonify({'error': 'Admin only'}), 403
 
         client_ids = db.get_active_client_ids()
@@ -50,7 +50,7 @@ def demo_push():
     db = Database()
     try:
         current_user = db.get_web_user_by_id(session['user_id']) or {}
-        if current_user.get('role') != 'admin':
+        if current_user.get('role') not in ('admin', 'super-admin'):
             return jsonify({'error': 'Admin only'}), 403
 
         body = request.get_json(silent=True) or {}

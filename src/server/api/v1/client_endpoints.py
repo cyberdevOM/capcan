@@ -139,8 +139,11 @@ def push_client_config():
     finally:
         db.close()
 
-    if user.get('role') != 'admin':
-        return jsonify({"error": "Admin role required"}), 403
+    role = user.get('role', 'read-only')
+    _ADMIN_ROLES = ('super-admin', 'admin')
+
+    if role not in _ADMIN_ROLES and role != 'analyst':
+        return jsonify({"error": "Insufficient permissions"}), 403
 
     body = request.get_json(silent=True)
     if not body:
@@ -169,8 +172,9 @@ def push_client_config():
     if "interval" in settings:
         try:
             interval = int(settings["interval"])
-            if interval < 10:
-                return jsonify({"error": "'interval' must be >= 10 seconds"}), 400
+            min_interval = 10 if role in _ADMIN_ROLES else 1800
+            if interval < min_interval:
+                return jsonify({"error": f"'interval' must be >= {min_interval} seconds"}), 400
             settings["interval"] = interval
         except (TypeError, ValueError):
             return jsonify({"error": "'interval' must be an integer"}), 400
@@ -307,6 +311,14 @@ def admin_add_client():
     if not web_session.get('user_id'):
         return jsonify({"error": "Authentication required"}), 401
 
+    db_auth = Database()
+    try:
+        caller = db_auth.get_web_user_by_id(web_session['user_id']) or {}
+    finally:
+        db_auth.close()
+    if caller.get('role') not in ('super-admin', 'admin'):
+        return jsonify({"error": "Admin role required"}), 403
+
     body = request.get_json(silent=True)
     if not body:
         return jsonify({"error": "JSON body required"}), 400
@@ -384,6 +396,14 @@ def admin_delete_client(client_id):
 
     if not web_session.get('user_id'):
         return jsonify({"error": "Authentication required"}), 401
+
+    db_auth = Database()
+    try:
+        caller = db_auth.get_web_user_by_id(web_session['user_id']) or {}
+    finally:
+        db_auth.close()
+    if caller.get('role') not in ('super-admin', 'admin'):
+        return jsonify({"error": "Admin role required"}), 403
 
     body     = request.get_json(silent=True) or {}
     password = body.get("password", "")

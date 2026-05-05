@@ -295,6 +295,21 @@
     background: var(--button-primary-bg-hover);
 }
 
+.settings-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.settings-btn-secondary {
+    background: transparent;
+    color: var(--text-main);
+    border-color: var(--divider-color);
+}
+
+.settings-btn-secondary:hover {
+    background: var(--bg-main);
+}
+
 .settings-feedback {
     font-size: 0.85rem;
     color: var(--text-secondary);
@@ -505,9 +520,10 @@
     text-transform: capitalize;
 }
 
-.role-admin    { background: rgba(52, 152, 219, 0.15); color: #2980b9; }
-.role-analyst  { background: rgba(39, 174, 96, 0.15);  color: #229954; }
-.role-readonly { background: rgba(127, 140, 141, 0.15); color: #7f8c8d; }
+.role-admin      { background: rgba(52, 152, 219, 0.15); color: #2980b9; }
+.role-superadmin { background: rgba(155, 89, 182, 0.15); color: #8e44ad; }
+.role-analyst    { background: rgba(39, 174, 96, 0.15);  color: #229954; }
+.role-readonly   { background: rgba(127, 140, 141, 0.15); color: #7f8c8d; }
 
 .status-dot {
     display: inline-block;
@@ -524,6 +540,50 @@
     color: var(--text-secondary);
     padding: 2rem 0;
     font-style: italic;
+}
+
+/* ── User role editing controls ─────────────────── */
+
+.settings-select {
+    padding: 0.35rem 0.6rem;
+    border: 1.5px solid var(--input-primary-border, #ccc);
+    border-radius: 8px;
+    background: var(--input-primary-bg, #fff);
+    color: var(--input-primary-text, #222);
+    font-size: 0.85rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.settings-select:focus {
+    border-color: var(--button-primary-bg);
+}
+
+.settings-btn-sm {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.82rem;
+}
+
+.user-role-edit {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.user-role-feedback {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.feedback-ok  { color: #27ae60; }
+.feedback-err { color: #e74c3c; }
+
+.user-lock-icon {
+    color: var(--text-secondary);
+    opacity: 0.5;
+    font-size: 0.85rem;
+    cursor: default;
 }
 
 
@@ -710,3 +770,143 @@
     padding: 2px 7px;
     vertical-align: middle;
 }
+
+/* ── Add User modal ──────────────────────────────── */
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-card {
+    background: var(--bg-card);
+    border: 1.5px solid var(--divider-color);
+    border-radius: 14px;
+    width: min(480px, 92vw);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem 1.4rem 0.9rem;
+    border-bottom: 1.5px solid var(--divider-color);
+}
+
+.modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.1rem 0.4rem;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.modal-close:hover {
+    background: var(--bg-main);
+    color: var(--text-main);
+}
+
+.modal-body {
+    padding: 1.2rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.modal-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.modal-input,
+.modal-select {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.modal-password-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.modal-password-wrap .modal-input {
+    padding-right: 2.6rem;
+}
+
+.modal-toggle-pw {
+    position: absolute;
+    right: 0.7rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.modal-field-error {
+    display: none;
+    font-size: 0.8rem;
+    color: #e74c3c;
+    font-weight: 500;
+}
+
+.modal-footer {
+    padding: 0.9rem 1.4rem 1.2rem;
+    border-top: 1.5px solid var(--divider-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.modal-footer-btns {
+    display: flex;
+    gap: 0.6rem;
+    margin-left: auto;
+}
+
+.modal-feedback {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.modal-feedback-err { color: #e74c3c; }
