@@ -6,3 +6,6 @@ src/server/web/templates/pre_renders/__pycache__
 note.md
 CODEBASE_REPORTS.md
 **/dist
+**/build
+.vscode
+**/simulated_telemetry

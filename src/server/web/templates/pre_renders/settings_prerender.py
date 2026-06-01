@@ -41,16 +41,16 @@ def render_account_settings():
     return Markup(html)
 
 
-def render_client_settings():
+def render_client_settings(): # match interval value with settings from client_main, deployer, and clients_prerender
     """Render client configuration settings."""
     html = """
     <div class="setting-item">
         <div class="setting-info">
             <div class="setting-label">Telemetry Report Interval (minutes)</div>
-            <div class="setting-description">How often clients collect and send telemetry data to the server. Default is 5 minutes.</div>
+            <div class="setting-description">How often clients collect and send telemetry data to the server. Default is 2 minutes.</div>
         </div>
         <div class="setting-control" style="gap: 0.5rem; display: flex; align-items: center;">
-            <input type="number" class="settings-number-input" value="5" min="1" max="60" id="heartbeatInterval">
+            <input type="number" class="settings-number-input" value="2" min="1" max="60" id="heartbeatInterval">
             <button class="settings-btn settings-btn-primary" onclick="pushIntervalToAllClients()">Push to All Clients</button>
         </div>
     </div>

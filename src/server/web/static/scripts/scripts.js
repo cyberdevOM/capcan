@@ -955,8 +955,16 @@ function relativeTime(isoStr) {
 
 // ── Critical Alert Toast Banners ────────────────────────────────────────────
 
-// In-memory only — no sessionStorage, so new alerts always surface during a session.
-const toast_seen = new Set();
+// Persisted in sessionStorage so toasts are not re-shown after a page reload.
+const TOAST_SEEN_KEY = 'capcan_toast_seen';
+function _load_toast_seen() {
+    try { return new Set(JSON.parse(sessionStorage.getItem(TOAST_SEEN_KEY) || '[]')); }
+    catch { return new Set(); }
+}
+function _save_toast_seen(set) {
+    try { sessionStorage.setItem(TOAST_SEEN_KEY, JSON.stringify([...set])); } catch {}
+}
+const toast_seen = _load_toast_seen();
 // True until the first fetch completes; used to age-gate startup toasts.
 let toast_first_fetch = true;
 
@@ -1051,11 +1059,13 @@ function pollCriticalAlerts() {
                         const ageSec = (now - new Date(a.created_at).getTime()) / 1000;
                         if (ageSec > 300) {
                             toast_seen.add(id); // silently mark seen
+                            _save_toast_seen(toast_seen);
                             return;
                         }
                     }
 
                     toast_seen.add(id);
+                    _save_toast_seen(toast_seen);
                     showAlertToast(a);
                 });
             })

@@ -186,14 +186,14 @@ def render_client_details(client_id=None, user_role='read-only'):
     can_config = user_role in ('admin', 'super-admin', 'analyst')
     can_act = user_role in ('admin', 'super-admin')
 
-    if can_config:
+    if can_config: # match interval value with settings from client_main, deployer, and settings_prerender
         config_html = f"""
     <div class="config-form" id="config-form-{cid}">
         <div class="config-row">
             <label class="config-label">Report interval (minutes)</label>
             <input type="number" class="config-input" id="cfg-interval-{cid}"
                    min="1" max="60"
-                   value="{round(effective_settings.get('interval', 300) / 60)}">
+                   value="{round(effective_settings.get('interval', 120) / 60)}"> 
         </div>
         <div class="config-row">
             <label class="config-label">Collect</label>
