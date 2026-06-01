@@ -25,6 +25,7 @@ from ...utils.validators import (
     generate_ack_id,
 )
 from ...core.database import Database
+from ...utils import telemetry_cache
 
 telemetry_bp = Blueprint('telemetry', __name__, url_prefix='/telemetry')
 

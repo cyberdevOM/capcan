@@ -22,9 +22,9 @@ class Config:
             self.notification_integrations(self.curs)
             self.server_audit_logs(self.curs)
             self.conn.commit()
-            print("Tables created successfully.")
+            print("[INFO] Tables created successfully.")
         except Exception as error:
-            print(error)
+            print(f"[ERROR] Failed to create tables: {error}")
             self.conn.rollback()
 
     def create_enums(self):
@@ -43,12 +43,13 @@ class Config:
                 except psycopg2.Error as e:
                     self.conn.rollback()
                     if "already exists" in str(e):
-                        print(f"Enum {enum_name} already exists, skipping.")
+                        #print(f"[INFO] Enum {enum_name} already exists, skipping.")
+                        pass
                     else:
                         raise
-            print("Enums created successfully.")
+            print("[INFO] Enums created successfully.")
         except Exception as error:
-            print(error)
+            print(f"[ERROR] Failed to create enums: {error}")
 
     def registered_clients(self, cursor):
         query = """

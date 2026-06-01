@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeSettingsNav(); // Settings sidebar navigation
     initializeDebugGrid(); // Debugging helpers
     initializePasswordToggles(); // Show/hide password buttons
-    initializeDemoSettings(); // Demo mode toggle (only active when panel exists)
+    initializeDemoSettings(); // Demo mode selector (only active when panel exists)
     pollAlertCount();       // Notification badge — runs on every page
     pollCriticalAlerts();   // Toast banners for critical alerts — runs on every page
     pollDashboardTiles();   // Live dashboard tile updates (no-op if not on dashboard)
@@ -294,46 +294,68 @@ document.addEventListener('DOMContentLoaded', function () {
 /// === DEMO MODE === ///
 
 function initializeDemoSettings() {
-    const toggle = document.getElementById('demoModeToggle');
-    if (!toggle) return; // demo panel not present
+    const selector = document.getElementById('demoModeSelector');
+    if (!selector) return; // demo panel not rendered (server not started with --demo)
 
     refreshDemoStatus();
 
-    toggle.addEventListener('change', function () {
-        const enabled = this.checked;
-        const feedback = document.getElementById('demoFeedback');
-        const rateInput = document.getElementById('demoAlertRate');
-        const alertRate = rateInput ? parseInt(rateInput.value, 10) : 20;
-        feedback.textContent = 'Saving…';
-        feedback.style.color = 'var(--text-secondary)';
+    selector.querySelectorAll('.demo-seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => setDemoMode(btn.dataset.mode));
+    });
+}
 
-        const payload = { demo_mode: enabled };
-        if (!isNaN(alertRate) && alertRate > 0) payload.demo_alerts_per_hour = alertRate;
+/**
+ * Push a simulation mode to all active clients.
+ * mode: 'false' | 'simulated' | 'script'
+ */
+function setDemoMode(mode) {
+    const feedback  = document.getElementById('demoFeedback');
+    const rateInput = document.getElementById('demoAlertRate');
+    const alertRate = rateInput ? parseInt(rateInput.value, 10) : 20;
 
-        fetch('/api/v1/demo/push', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+    if (feedback) { feedback.textContent = 'Saving\u2026'; feedback.style.color = 'var(--text-secondary)'; }
+
+    const payload = { demo_mode: mode };
+    // Include alert rate only when enabling simulated mode
+    if (mode === 'simulated' && !isNaN(alertRate) && alertRate > 0) {
+        payload.demo_alerts_per_hour = alertRate;
+    }
+
+    fetch('/api/v1/demo/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                if (feedback) { feedback.textContent = data.message; feedback.style.color = 'var(--success-color, #27ae60)'; }
+                _applyDemoModeUI(mode);     // optimistic UI update
+                refreshDemoStatus();
+            } else {
+                if (feedback) { feedback.textContent = data.error || 'Failed to update mode.'; feedback.style.color = 'var(--error-color, #e74c3c)'; }
+            }
+            if (feedback) setTimeout(() => { feedback.textContent = ''; }, 4000);
         })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    feedback.textContent = data.message;
-                    feedback.style.color = 'var(--success-color, #27ae60)';
-                    refreshDemoStatus();
-                } else {
-                    feedback.textContent = data.error || 'Failed to update demo mode.';
-                    feedback.style.color = 'var(--error-color, #e74c3c)';
-                    toggle.checked = !enabled; // revert
-                }
-                setTimeout(() => { feedback.textContent = ''; }, 4000);
-            })
-            .catch(() => {
-                feedback.textContent = 'Request failed.';
-                feedback.style.color = 'var(--error-color, #e74c3c)';
-                toggle.checked = !enabled;
-                setTimeout(() => { feedback.textContent = ''; }, 4000);
-            });
+        .catch(() => {
+            if (feedback) { feedback.textContent = 'Request failed.'; feedback.style.color = 'var(--error-color, #e74c3c)'; setTimeout(() => { feedback.textContent = ''; }, 4000); }
+        });
+}
+
+/** Update the segment highlight and show the matching info panel. */
+function _applyDemoModeUI(mode) {
+    // Highlight active segment
+    const selector = document.getElementById('demoModeSelector');
+    if (selector) {
+        selector.querySelectorAll('.demo-seg-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+    }
+    // Show the relevant info panel, hide the others
+    const panels = { simulated: 'demoInfoSynthetic', script: 'demoInfoScript' };
+    Object.entries(panels).forEach(([m, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (mode === m) ? '' : 'none';
     });
 }
 
@@ -354,16 +376,21 @@ function pushIntervalToAllClients() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ client_ids: 'all', settings: { interval: minutes * 60 } }),
     })
-        .then(r => r.json())
-        .then(data => {
+        .then(r => r.json().then(data => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
             if (feedback) {
-                feedback.textContent = data.message || 'Done.';
-                feedback.style.color = 'var(--success-color, #27ae60)';
+                if (ok) {
+                    feedback.textContent = data.message || `Interval queued for all clients.`;
+                    feedback.style.color = 'var(--success-color, #27ae60)';
+                } else {
+                    feedback.textContent = data.error || 'Failed to push interval.';
+                    feedback.style.color = 'var(--error-color, #e74c3c)';
+                }
                 setTimeout(() => { feedback.textContent = ''; }, 4000);
             }
         })
         .catch(() => {
-            if (feedback) { feedback.textContent = 'Request failed.'; feedback.style.color = 'var(--error-color, #e74c3c)'; }
+            if (feedback) { feedback.textContent = 'Request failed.'; feedback.style.color = 'var(--error-color, #e74c3c)'; setTimeout(() => { feedback.textContent = ''; }, 4000); }
         });
 }
 
@@ -377,7 +404,7 @@ function pushDemoAlertRate() {
         return;
     }
 
-    if (feedback) { feedback.textContent = 'Applying…'; feedback.style.color = 'var(--text-secondary)'; }
+    if (feedback) { feedback.textContent = 'Applying\u2026'; feedback.style.color = 'var(--text-secondary)'; }
 
     fetch('/api/v1/demo/push', {
         method: 'POST',
@@ -400,34 +427,32 @@ function pushDemoAlertRate() {
 
 function refreshDemoStatus() {
     const statusText = document.getElementById('demoStatusText');
-    const toggle = document.getElementById('demoModeToggle');
-    if (!statusText || !toggle) return;
+    if (!statusText) return;
 
     fetch('/api/v1/demo/status')
         .then(r => r.json())
         .then(data => {
-            if (data.error) {
-                statusText.textContent = 'Unable to load status.';
-                return;
-            }
-            const { total_active_clients, demo_enabled_clients, demo_pending_clients } = data;
-            const applied = demo_enabled_clients - demo_pending_clients;
-            if (demo_enabled_clients === 0) {
-                statusText.textContent =
-                    `${total_active_clients} active client(s) — demo mode disabled.`;
-            } else if (demo_pending_clients > 0) {
-                statusText.textContent =
-                    `${applied} of ${total_active_clients} client(s) applied, ` +
-                    `${demo_pending_clients} pending next check-in.`;
-            } else {
-                statusText.textContent =
-                    `${demo_enabled_clients} of ${total_active_clients} active client(s) have demo mode enabled.`;
-            }
-            toggle.checked = demo_enabled_clients > 0;
+            if (data.error) { statusText.textContent = 'Unable to load status.'; return; }
+
+            const { total_active_clients, modes, pending_changes } = data;
+
+            // Determine the dominant active mode for the segment highlight
+            let activeMode = 'false';
+            if ((modes.simulated || 0) > 0 && (modes.script || 0) === 0) activeMode = 'simulated';
+            else if ((modes.script || 0) > 0 && (modes.simulated || 0) === 0) activeMode = 'script';
+            // If both are non-zero, leave as 'false' (mixed state — no segment highlighted)
+            _applyDemoModeUI(activeMode);
+
+            // Build human-readable status line
+            const parts = [];
+            if (modes.simulated > 0) parts.push(`${modes.simulated} simulated`);
+            if (modes.script    > 0) parts.push(`${modes.script} script-based`);
+            const activeStr  = parts.length ? parts.join(', ') : 'none';
+            const pendingStr = pending_changes > 0 ? ` \u2014 ${pending_changes} pending check-in` : '';
+            statusText.textContent =
+                `${total_active_clients} active client(s) \u2014 demo active: ${activeStr}${pendingStr}`;
         })
-        .catch(() => {
-            statusText.textContent = 'Unable to load status.';
-        });
+        .catch(() => { statusText.textContent = 'Unable to load status.'; });
 }
 
 /// === DEBUGGING HELPERS === ///
@@ -693,11 +718,11 @@ function showBreakpoints() {
 // ========================================================
 
 // ---- State ----
-let _allAlerts = [];
-let _selectedAlertId = null;
+let all_alerts = [];
+let selected_alert_id = null;
 
 // ---- Nav badge polling ----
-let _lastAlertCount = -1; // -1 = not yet known
+let last_alert_count = -1; // -1 = not yet known
 
 function pollAlertCount() {
     function fetchCount() {
@@ -719,12 +744,12 @@ function pollAlertCount() {
                 }
 
                 // If the count has risen since last check, immediately surface new alerts
-                if (_lastAlertCount >= 0 && n > _lastAlertCount) {
+                if (last_alert_count >= 0 && n > last_alert_count) {
                     // Trigger toast check and dashboard tile refresh right away
-                    if (typeof _fetchCriticalNow === 'function') _fetchCriticalNow();
-                    if (typeof _refreshDashboardNow === 'function') _refreshDashboardNow();
+                    if (typeof fetch_critical_now === 'function') fetch_critical_now();
+                    if (typeof refresh_dashboard_now === 'function') refresh_dashboard_now();
                 }
-                _lastAlertCount = n;
+                last_alert_count = n;
             })
             .catch(() => {});
     }
@@ -745,11 +770,11 @@ function loadAlerts() {
     return fetch('/api/v1/web/alerts?limit=500')
         .then(r => r.ok ? r.json() : { alerts: [] })
         .then(data => {
-            _allAlerts = data.alerts || [];
+            all_alerts = data.alerts || [];
             filterAlerts(); // apply current filter state to fresh data
         })
         .catch(() => {
-            _allAlerts = [];
+            all_alerts = [];
             renderAlertList([]);
         });
 }
@@ -759,7 +784,7 @@ function filterAlerts() {
     const severity = document.getElementById('alertSeverityFilter')?.value || '';
     const status   = document.getElementById('alertStatusFilter')?.value || '';
 
-    const filtered = _allAlerts.filter(a => {
+    const filtered = all_alerts.filter(a => {
         if (severity && a.severity !== severity) return false;
         if (status   && a.status   !== status)   return false;
         if (q) {
@@ -782,7 +807,7 @@ function renderAlertList(alerts) {
     }
 
     list.innerHTML = alerts.map(a => `
-        <div class="alert-item sev-${a.severity || 'undefined'}${a.alert_id === _selectedAlertId ? ' selected' : ''}"
+        <div class="alert-item sev-${a.severity || 'undefined'}${a.alert_id === selected_alert_id ? ' selected' : ''}"
              id="alert-item-${a.alert_id}"
              onclick="selectAlert('${a.alert_id}')">
             <div class="alert-item-header">
@@ -801,12 +826,12 @@ function renderAlertList(alerts) {
 }
 
 function selectAlert(alertId) {
-    _selectedAlertId = alertId;
+    selected_alert_id = alertId;
     document.querySelectorAll('.alert-item').forEach(el => {
         el.classList.toggle('selected', el.id === 'alert-item-' + alertId);
     });
 
-    const alert = _allAlerts.find(a => a.alert_id === alertId);
+    const alert = all_alerts.find(a => a.alert_id === alertId);
     if (!alert) return;
 
     const panel = document.getElementById('alertDetailPanel');
@@ -824,11 +849,11 @@ function selectAlert(alertId) {
             </div>`;
     }
 
-    const _role = window.CAPCAN_USER_ROLE || 'read-only';
-    const _canAct = _role !== 'read-only';
+    const role = window.CAPCAN_USER_ROLE || 'read-only';
+    const can_act = role !== 'read-only';
 
-    const canAck  = _canAct && alert.status === 'unresolved';
-    const canRes  = _canAct && alert.status === 'acknowledged'; // must acknowledge first
+    const can_ack  = can_act && alert.status === 'unresolved';
+    const can_res  = can_act && alert.status === 'acknowledged'; // must acknowledge first
 
     panel.innerHTML = `
         <div class="alert-detail-header">
@@ -843,11 +868,11 @@ function selectAlert(alertId) {
                 </div>
             </div>
             <div class="alert-detail-actions">
-                <button class="alert-btn alert-btn-ack" ${canAck ? '' : 'disabled'}
+                <button class="alert-btn alert-btn-ack" ${can_ack ? '' : 'disabled'}
                         onclick="acknowledgeAlert('${alert.alert_id}')">
                     <i class="fas fa-check-circle"></i> Acknowledge
                 </button>
-                <button class="alert-btn alert-btn-resolve" ${canRes ? '' : 'disabled'}
+                <button class="alert-btn alert-btn-resolve" ${can_res ? '' : 'disabled'}
                         onclick="resolveAlert('${alert.alert_id}')">
                     <i class="fas fa-check-double"></i> Resolve
                 </button>
@@ -931,11 +956,11 @@ function relativeTime(isoStr) {
 // ── Critical Alert Toast Banners ────────────────────────────────────────────
 
 // In-memory only — no sessionStorage, so new alerts always surface during a session.
-const _toastSeen = new Set();
+const toast_seen = new Set();
 // True until the first fetch completes; used to age-gate startup toasts.
-let _toastFirstFetch = true;
+let toast_first_fetch = true;
 
-function _toastSevClass(sev) {
+function toast_sev_class(sev) {
     const map = { critical:'', high:'toast-high', medium:'toast-medium',
                   low:'toast-low', info:'toast-info' };
     return map[sev] || '';
@@ -946,14 +971,14 @@ function showAlertToast(alert) {
     if (!container) return;
 
     const sev      = (alert.severity || 'critical').toLowerCase();
-    const sevClass = _toastSevClass(sev);
+    const sev_class = toast_sev_class(sev);
     const event    = escapeHtml(alert.event_type || 'Unknown event');
     const host     = escapeHtml(alert.hostname || alert.client_id || '?');
     const id       = alert.alert_id;
     const status   = alert.status || 'unresolved';
 
     const toast = document.createElement('div');
-    toast.className = `alert-toast ${sevClass}`;
+    toast.className = `alert-toast ${sev_class}`;
     toast.dataset.alertId = id;
 
     const canAck = status === 'unresolved';
@@ -974,14 +999,14 @@ function showAlertToast(alert) {
     `;
 
     toast.querySelector('.alert-toast-close').addEventListener('click', () => {
-        _dismissToast(toast);
+        dismiss_toast(toast);
     });
 
     const ackBtn = toast.querySelector('.alert-toast-btn-ack');
     if (ackBtn) ackBtn.addEventListener('click', () => {
         fetch(`/api/v1/web/alerts/${id}/acknowledge`, { method: 'POST' })
             .then(r => r.ok ? r.json() : null)
-            .then(() => _dismissToast(toast))
+            .then(() => dismiss_toast(toast))
             .catch(() => {});
     });
 
@@ -989,18 +1014,18 @@ function showAlertToast(alert) {
     if (resBtn) resBtn.addEventListener('click', () => {
         fetch(`/api/v1/web/alerts/${id}/resolve`, { method: 'POST' })
             .then(r => r.ok ? r.json() : null)
-            .then(() => _dismissToast(toast))
+            .then(() => dismiss_toast(toast))
             .catch(() => {});
     });
 
     container.appendChild(toast);
 
-    const timer = setTimeout(() => _dismissToast(toast), 10000);
-    toast._dismissTimer = timer;
+    const timer = setTimeout(() => dismiss_toast(toast), 10000);
+    toast.dismiss_timer = timer;
 }
 
-function _dismissToast(toast) {
-    clearTimeout(toast._dismissTimer);
+function dismiss_toast(toast) {
+    clearTimeout(toast.dismiss_timer);
     toast.style.transition = 'opacity 0.3s, transform 0.3s';
     toast.style.opacity = '0';
     toast.style.transform = 'translateX(60px)';
@@ -1013,31 +1038,31 @@ function pollCriticalAlerts() {
             .then(r => r.ok ? r.json() : { alerts: [] })
             .then(data => {
                 const now = Date.now();
-                const isFirst = _toastFirstFetch;
-                _toastFirstFetch = false;
+                const is_first = toast_first_fetch;
+                toast_first_fetch = false;
 
                 (data.alerts || []).forEach(a => {
                     const id = a.alert_id;
-                    if (_toastSeen.has(id)) return;
+                    if (toast_seen.has(id)) return;
 
                     // On the very first fetch, only surface alerts created in the last 5 min
                     // to avoid spamming toasts for a backlog of old alerts on page load.
-                    if (isFirst && a.created_at) {
+                    if (is_first && a.created_at) {
                         const ageSec = (now - new Date(a.created_at).getTime()) / 1000;
                         if (ageSec > 300) {
-                            _toastSeen.add(id); // silently mark seen
+                            toast_seen.add(id); // silently mark seen
                             return;
                         }
                     }
 
-                    _toastSeen.add(id);
+                    toast_seen.add(id);
                     showAlertToast(a);
                 });
             })
             .catch(() => {});
     }
     // Expose so pollAlertCount can trigger an immediate check on count rise
-    window._fetchCriticalNow = fetchCritical;
+    window.fetch_critical_now = fetchCritical;
     fetchCritical();
     setInterval(fetchCritical, 15000); // poll every 15s as a fallback
 }
@@ -1074,7 +1099,7 @@ function pollDashboardTiles() {
     }
 
     // Expose so pollAlertCount can trigger an immediate refresh on count rise
-    window._refreshDashboardNow = updateTiles;
+    window.refresh_dashboard_now = updateTiles;
 
     // First update after a short delay (let the page settle), then every 30s
     setTimeout(updateTiles, 5000);

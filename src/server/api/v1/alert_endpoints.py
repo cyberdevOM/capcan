@@ -35,15 +35,14 @@ VALID_EVENT_TYPES = [
     "login_failed",
     "login_success",
     "service_stopped",
+    "honeypot_access",
     "custom"
 ]
-
-database = Database()  # Initialize database connection
 
 # ========== HELPER FUNCTIONS ==========
 
 
-def validate_alert_request() -> tuple[bool, Dict[str, Any], int]:
+def validate_alert_request(db: Database) -> tuple[bool, Dict[str, Any], int]:
     """
     Validate alert submission request with HMAC authentication.
 
@@ -53,17 +52,16 @@ def validate_alert_request() -> tuple[bool, Dict[str, Any], int]:
     - Signature matches
     - client is registered
 
-    args: client_id: uuid from request headers
+    args: db: open Database connection (caller owns lifecycle)
+          client_id: uuid from request headers
 
     returns: Tuple of (success, response_dict, status_code)
     """
 
     # Extract security headers
     headers_client_id, timestamp, signature = extract_security_headers(request.headers)
-    print(f"[DEBUG] validate_alert_request: headers_client_id={headers_client_id}, timestamp={timestamp}, signature={signature}", flush=True)
 
     if not headers_client_id:
-        print("[DEBUG] Missing security headers", flush=True)
         return (
             False,
             {
@@ -75,17 +73,12 @@ def validate_alert_request() -> tuple[bool, Dict[str, Any], int]:
 
     # Validate timestamp
     valid_time, time_error = validate_timestamp(timestamp)
-    print(f"[DEBUG] Timestamp valid: {valid_time}, error: {time_error}", flush=True)
     if not valid_time:
-        print("[DEBUG] Invalid timestamp", flush=True)
         return False, {"error": f"Invalid timestamp: {time_error}"}, 401
 
-    # Validate client ID matches
-    print(f"[DEBUG] Checking client registration for {headers_client_id}", flush=True)
-    client_check = database.get_client_by_id(headers_client_id)
-    print(f"[DEBUG] database.get_client_by_id returned: {client_check}", flush=True)
+    # Validate client is registered
+    client_check = db.get_client_by_id(headers_client_id)
     if client_check is None:
-        print("[DEBUG] Client not registered", flush=True)
         return (
             False,
             {
@@ -96,7 +89,7 @@ def validate_alert_request() -> tuple[bool, Dict[str, Any], int]:
         )
 
     # Get client secret
-    secret_key = database.get_client_secret(headers_client_id)
+    secret_key = db.get_client_secret(headers_client_id)
     if not secret_key:
         return False, {"error": "Client secret not found."}, 401
 
@@ -224,15 +217,16 @@ def submit_alert():
     """
 
     # validate request authentication
-    valid, error_response, status_code = validate_alert_request()
-    if not valid:
-        return jsonify(error_response), status_code
-
-    headers_client_id, _, _ = extract_security_headers(
-        request.headers
-    )
-
+    db = Database()
     try:
+        valid, error_response, status_code = validate_alert_request(db)
+        if not valid:
+            return jsonify(error_response), status_code
+
+        headers_client_id, _, _ = extract_security_headers(
+            request.headers
+        )
+
         # Parse JSON body
         try: 
             data = request.get_json()
@@ -260,7 +254,7 @@ def submit_alert():
         # create alert record
         # * Note: Please see database config in /core/config.py for the alert schema.
 
-        database.store_alerts(
+        db.store_alerts(
             client_id=headers_client_id,
             alert_id=alert_id,  # * Generated unique alert ID
             rule_id=data["event_type"],
@@ -292,6 +286,8 @@ def submit_alert():
 
     except Exception as e:
         return jsonify({"error": f"Error processing alert: {str(e)}"}), 500
+    finally:
+        db.close()
 
 
 # ========== SUBMIT BULK ALERTS ENDPOINT ==========
@@ -341,12 +337,13 @@ def submit_bulk_alerts():  # TODO: Change endpoint to integrate with database
     if not headers_client_id:
         return jsonify({"error": "Missing X-Client-ID header."}), 401
 
-    # validate request authentication
-    valid, error_response, status_code = validate_alert_request()
-    if not valid:
-        return jsonify(error_response), status_code
-    
+    db = Database()
     try:
+        # validate request authentication
+        valid, error_response, status_code = validate_alert_request(db)
+        if not valid:
+            return jsonify(error_response), status_code
+
         # parse bulk alert data
         try: 
             data = request.get_json()
@@ -374,7 +371,7 @@ def submit_bulk_alerts():  # TODO: Change endpoint to integrate with database
             # Generate alert metadata
             alert_id = generate_alert_id()
             alert_timestamp = alert_data.get("timestamp", current_time)
-            database.store_alerts(
+            db.store_alerts(
                 client_id=headers_client_id,
                 alert_id=alert_id,
                 rule_id=alert_data["event_type"],
@@ -406,6 +403,8 @@ def submit_bulk_alerts():  # TODO: Change endpoint to integrate with database
 
     except Exception as e:
         return jsonify({"error": f"Error processing bulk alerts: {str(e)}"}), 500
+    finally:
+        db.close()
 
 
 # =========== Acknowledge alert endpoint ==========
@@ -429,12 +428,13 @@ def acknowledge_alert(alert_id):
         "acknowledged_by": string
     }
     """
+    db = Database()
     try:
         data = request.get_json() or {}
         acknowledged_by = data.get("acknowledged_by", "server")
         current_time = dt.datetime.now(dt.timezone.utc).isoformat() + "Z"
 
-        ok = database.acknowledge_alert(alert_id, acknowledged_by=acknowledged_by)
+        ok = db.acknowledge_alert(alert_id, acknowledged_by=acknowledged_by)
         if not ok:
             return jsonify({"error": "Alert not found.", "alert_id": alert_id}), 404
 
@@ -447,6 +447,8 @@ def acknowledge_alert(alert_id):
 
     except Exception as e:
         return jsonify({"error": f"Failed to acknowledge alert: {str(e)}"}), 500
+    finally:
+        db.close()
 
 
 # ========== GET ALERT HISTORY ENDPOINT ==========
@@ -464,6 +466,7 @@ def get_alert_history():
         ?event_type=string  Filter by event type
         ?limit=integer      Limit number of results (default 100)
     """
+    db = Database()
     try:
         client_id_filter = request.args.get("client_id")
         severity_filter = request.args.get("severity")
@@ -471,7 +474,7 @@ def get_alert_history():
         event_type_filter = request.args.get("event_type")
         limit = request.args.get("limit", type=int, default=100)
 
-        alerts = database.get_all_alerts(
+        alerts = db.get_all_alerts(
             client_id=client_id_filter,
             severity=severity_filter,
             status=status_filter,
@@ -491,6 +494,8 @@ def get_alert_history():
 
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve alerts: {str(e)}"}), 500
+    finally:
+        db.close()
 
 
 # ============ GET SINGLE ALERT ENDPOINT ============
@@ -515,20 +520,21 @@ def get_single_alert(alert_id):
     }
     """
 
+    db = Database()
     try:
         row = None
         try:
-            database.cursor.execute(
+            db.cursor.execute(
                 "SELECT alert_id, client_id, rule_id, severity, score, event_type, "
                 "status, acknowledged_at, acknowledged_by, created_at, details, tags "
                 "FROM client_alerts WHERE alert_id = %s",
                 (alert_id,),
             )
-            row = database.cursor.fetchone()
+            row = db.cursor.fetchone()
         except Exception as db_err:
             print(f"[ERROR] get_single_alert DB: {db_err}")
-            if database.conn:
-                database.conn.rollback()
+            if db.conn:
+                db.conn.rollback()
 
         if not row:
             return jsonify({"error": "Alert not found.", "alert_id": alert_id}), 404
@@ -543,6 +549,8 @@ def get_single_alert(alert_id):
 
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve alert: {str(e)}"}), 500
+    finally:
+        db.close()
 
 
 # ============ RESOLVE ALERT ENDPOINT ============
@@ -553,10 +561,13 @@ def resolve_alert(alert_id):
 
     Endpoint: POST /api/alerts/resolve/<alert_id>
     """
+    db = Database()
     try:
-        ok = database.resolve_alert(alert_id)
+        ok = db.resolve_alert(alert_id)
         if not ok:
             return jsonify({"error": "Alert not found.", "alert_id": alert_id}), 404
         return jsonify({"status": "resolved", "alert_id": alert_id}), 200
     except Exception as e:
         return jsonify({"error": f"Failed to resolve alert: {str(e)}"}), 500
+    finally:
+        db.close()

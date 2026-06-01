@@ -1,11 +1,12 @@
-let _activeClientId = null;
-let _activeClientName = null;
-const _chartInstances = {};
+let active_client_id = null;
+let active_client_name = null;
+const chart_instances = {};
+const _telemetry_polls = {};
 
 // ── Client selection ──────────────────────────────────────────
 function selectClient(clientId) {
-    _activeClientId = clientId;
-    _activeClientName = document.querySelector(`.client-item[data-client-id="${clientId}"] .client-id`)?.textContent || clientId;
+    active_client_id = clientId;
+    active_client_name = document.querySelector(`.client-item[data-client-id="${clientId}"] .client-id`)?.textContent || clientId;
     const deleteBtn = document.getElementById('deleteClientBtn');
     if (deleteBtn) deleteBtn.disabled = false;
 
@@ -50,23 +51,42 @@ function disconnectClient(clientId) {
 
 // ── Client Panel (charts + alerts) ───────────────────────────
 function loadClientPanel(clientId) {
-    // Destroy any Chart.js instances from the previous client
-    Object.keys(_chartInstances).forEach(k => {
-        _chartInstances[k].destroy();
-        delete _chartInstances[k];
+    // Clear all active telemetry polls before starting a new one
+    Object.keys(_telemetry_polls).forEach(id => {
+        clearInterval(_telemetry_polls[id]);
+        delete _telemetry_polls[id];
     });
-    _fetchTelemetryAndRenderCharts(clientId);
-    _loadPanelAlerts(clientId, 'all');
+
+    // Destroy any Chart.js instances from the previous client
+    Object.keys(chart_instances).forEach(k => {
+        chart_instances[k].destroy();
+        delete chart_instances[k];
+    });
+    fetch_telemetry_and_render_charts(clientId);
+    load_panel_alerts(clientId, 'all');
+
+    // Refresh charts, stat cards, and alerts every 30 seconds
+    _telemetry_polls[clientId] = setInterval(() => {
+        fetch_telemetry_and_render_charts(clientId);
+        load_panel_alerts(clientId, 'all', true);
+    }, 30000);
 }
 
-function _fetchTelemetryAndRenderCharts(clientId) {
+function fetch_telemetry_and_render_charts(clientId) {
     fetch(`/api/v1/telemetry/web/${clientId}/history?limit=50`)
         .then(r => r.json())
-        .then(data => _renderCharts(clientId, data.telemetry || []))
-        .catch(() => _renderCharts(clientId, []));
+        .then(data => {
+            // Destroy existing instances for this client before re-rendering
+            [`cpu-${clientId}`, `mem-${clientId}`, `disk-${clientId}`, `net-${clientId}`].forEach(k => {
+                if (chart_instances[k]) { chart_instances[k].destroy(); delete chart_instances[k]; }
+            });
+            render_charts(clientId, data.telemetry || []);
+            update_stat_cards(clientId, data.telemetry || []);
+        })
+        .catch(() => {});
 }
 
-function _renderCharts(clientId, rows) {
+function render_charts(clientId, rows) {
     if (typeof Chart === 'undefined') return;
 
     const labels = rows.map(r => {
@@ -135,9 +155,9 @@ function _renderCharts(clientId, rows) {
     const c1 = makeLineChart(`chart-cpu-${clientId}`,  cpuData,  '#4ade80', 100);
     const c2 = makeLineChart(`chart-mem-${clientId}`,  memData,  '#60a5fa', 100);
     const c3 = makeLineChart(`chart-disk-${clientId}`, diskData, '#f59e0b', 100);
-    if (c1) _chartInstances[`cpu-${clientId}`]  = c1;
-    if (c2) _chartInstances[`mem-${clientId}`]  = c2;
-    if (c3) _chartInstances[`disk-${clientId}`] = c3;
+    if (c1) chart_instances[`cpu-${clientId}`]  = c1;
+    if (c2) chart_instances[`mem-${clientId}`]  = c2;
+    if (c3) chart_instances[`disk-${clientId}`] = c3;
 
     // Network: two datasets (sent + received)
     const netCanvas = document.getElementById(`chart-net-${clientId}`);
@@ -145,13 +165,13 @@ function _renderCharts(clientId, rows) {
         const opts = JSON.parse(JSON.stringify(sharedOptions));
         opts.plugins.legend.display = true;
         opts.plugins.legend.labels = {color: '#a0a0b0', boxWidth: 10, font: {size: 10}};
-        _chartInstances[`net-${clientId}`] = new Chart(netCanvas, {
+        chart_instances[`net-${clientId}`] = new Chart(netCanvas, {
             type: 'line',
             data: {
                 labels,
                 datasets: [
-                    {label: 'Sent',  data: sentData, borderColor: '#a78bfa', backgroundColor: '#a78bfa22', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3},
-                    {label: 'Recv',  data: recvData, borderColor: '#34d399', backgroundColor: '#34d39922', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3},
+                    {label: 'Sent',  data: sentData, borderColor: '#a78bfa', backgroundColor: '#a78bfa22', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3, spanGaps: true},
+                    {label: 'Recv',  data: recvData, borderColor: '#34d399', backgroundColor: '#34d39922', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3, spanGaps: true},
                 ],
             },
             options: opts,
@@ -168,7 +188,7 @@ function _renderCharts(clientId, rows) {
 }
 
 // ── Panel alerts ──────────────────────────────────────────────
-function _loadPanelAlerts(clientId, filter, silent = false) {
+function load_panel_alerts(clientId, filter, silent = false) {
     const container = document.getElementById(`panel-alerts-${clientId}`);
     if (!container) return;
     if (!silent) {
@@ -188,7 +208,7 @@ function _loadPanelAlerts(clientId, filter, silent = false) {
                 container.innerHTML = '<div class="panel-alerts-empty"><i class="fas fa-check-circle"></i><span>No alerts found</span></div>';
                 return;
             }
-            container.innerHTML = alerts.map(a => _renderPanelAlertItem(a, clientId)).join('');
+            container.innerHTML = alerts.map(a => render_panel_alert_item(a, clientId)).join('');
         })
         .catch(() => {
             if (container) container.innerHTML = '<div class="panel-alerts-empty">Failed to load alerts.</div>';
@@ -198,13 +218,13 @@ function _loadPanelAlerts(clientId, filter, silent = false) {
 function filterPanelAlerts(btn, clientId) {
     btn.closest('.alert-filter-pills').querySelectorAll('.alert-pill').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
-    _loadPanelAlerts(clientId, btn.dataset.filter);
+    load_panel_alerts(clientId, btn.dataset.filter);
 }
 
-function _renderPanelAlertItem(a, clientId) {
+function render_panel_alert_item(a, clientId) {
     const severityColors = {critical: '#f87171', high: '#fb923c', medium: '#fbbf24', low: '#60a5fa', info: '#a78bfa'};
     const color = severityColors[a.severity] || '#a0a0b0';
-    const time  = _panelRelativeTime(a.created_at);
+    const time  = panel_relative_time(a.created_at);
     const statusClass = a.status === 'unresolved' ? 'unresolved' : a.status === 'acknowledged' ? 'acknowledged' : 'resolved';
     const statusLabel = a.status === 'unresolved' ? 'Open' : a.status === 'acknowledged' ? 'Ack' : 'Done';
 
@@ -228,13 +248,13 @@ function _renderPanelAlertItem(a, clientId) {
         ? `<span class="panel-alert-score" title="Risk score">${Math.round(a.score)}</span>`
         : '';
 
-    const _role = window.CAPCAN_USER_ROLE || 'read-only';
-    const _canAct = _role !== 'read-only';
+    const role = window.CAPCAN_USER_ROLE || 'read-only';
+    const can_act = role !== 'read-only';
 
-    const ackBtn = (_canAct && a.status === 'unresolved')
+    const ackBtn = (can_act && a.status === 'unresolved')
         ? `<button class="panel-alert-btn" title="Acknowledge" onclick="ackPanelAlert('${a.alert_id}','${clientId}')"><i class="fas fa-check"></i></button>`
         : '';
-    const resBtn = (_canAct && a.status === 'acknowledged')
+    const resBtn = (can_act && a.status === 'acknowledged')
         ? `<button class="panel-alert-btn resolve" title="Resolve" onclick="resolvePanelAlert('${a.alert_id}','${clientId}')"><i class="fas fa-times"></i></button>`
         : '';
 
@@ -248,14 +268,14 @@ function _renderPanelAlertItem(a, clientId) {
                 ${scoreHtml}
                 <span class="panel-alert-status ${statusClass}">${statusLabel}</span>
             </div>
-            ${detailSnippet ? `<div class="panel-alert-detail">${_escPanelHtml(detailSnippet)}</div>` : ''}
+            ${detailSnippet ? `<div class="panel-alert-detail">${esc_panel_html(detailSnippet)}</div>` : ''}
             <div class="panel-alert-time"><i class="fas fa-clock" style="opacity:.5;margin-right:3px"></i>${time}</div>
         </div>
         <div class="panel-alert-actions">${ackBtn}${resBtn}</div>
     </div>`;
 }
 
-function _escPanelHtml(str) {
+function esc_panel_html(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
@@ -263,25 +283,25 @@ function ackPanelAlert(alertId, clientId) {
     const el = document.querySelector(`[data-alert-id="${alertId}"]`);
     if (el) el.style.opacity = '0.4';
     fetch(`/api/v1/web/alerts/${alertId}/acknowledge`, {method: 'POST'})
-        .then(() => _reloadPanelAlerts(clientId));
+        .then(() => reload_panel_alerts(clientId));
 }
 
 function resolvePanelAlert(alertId, clientId) {
     const el = document.querySelector(`[data-alert-id="${alertId}"]`);
     if (el) el.style.opacity = '0.4';
     fetch(`/api/v1/web/alerts/${alertId}/resolve`, {method: 'POST'})
-        .then(() => _reloadPanelAlerts(clientId));
+        .then(() => reload_panel_alerts(clientId));
 }
 
-function _reloadPanelAlerts(clientId) {
+function reload_panel_alerts(clientId) {
     const activeFilter = document.querySelector(`#panel-alerts-${clientId}`)
         ?.closest('.panel-alerts-section')
         ?.querySelector('.alert-pill.active')
         ?.dataset.filter || 'all';
-    _loadPanelAlerts(clientId, activeFilter, true); // silent = no loading flash
+    load_panel_alerts(clientId, activeFilter, true); // silent = no loading flash
 }
 
-function _panelRelativeTime(isoStr) {
+function panel_relative_time(isoStr) {
     if (!isoStr) return '—';
     const diffMs = Date.now() - new Date(isoStr).getTime();
     const mins = Math.floor(diffMs / 60000);
@@ -322,33 +342,44 @@ function getSelectedClientIds() {
 }
 
 // ── Config push ───────────────────────────────────────────────
-function _readConfigForm(clientId) {
+function read_config_form(clientId) {
     const intervalMinutes = parseInt(document.getElementById(`cfg-interval-${clientId}`)?.value || '5', 10);
     const interval = intervalMinutes * 60;
-    const keys = ['cpu', 'memory', 'disk', 'network', 'processes'];
+    const collectKeys = ['cpu', 'memory', 'disk', 'network', 'processes', 'temperatures', 'top_processes'];
     const collect = {};
-    keys.forEach(k => {
+    collectKeys.forEach(k => {
         const el = document.getElementById(`cfg-${k}-${clientId}`);
         collect[k] = el ? el.checked : true;
     });
-    return { interval, collect };
+    const watcherKeys = ['file_integrity', 'process', 'network', 'login', 'service'];
+    const watchers = {};
+    watcherKeys.forEach(k => {
+        const el = document.getElementById(`cfg-w-${k}-${clientId}`);
+        watchers[k] = el ? el.checked : true;
+    });
+    return { interval, collect, watchers };
 }
 
 function pushConfig(clientIds, formSourceId) {
-    const settings = _readConfigForm(formSourceId);
+    const settings = read_config_form(formSourceId);
     const statusEl = document.getElementById(`cfg-status-${formSourceId}`);
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = 'config-status'; }
 
     fetch('/api/v1/clients/config', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ client_ids: clientIds, settings })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (statusEl) {
-            statusEl.textContent = data.message || JSON.stringify(data);
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+        if (!statusEl) return;
+        if (!ok || data.error) {
+            statusEl.textContent = 'Error: ' + (data.error || 'Unknown error');
+            statusEl.className = 'config-status error';
+        } else {
+            statusEl.textContent = (data.message || 'Settings queued') + ' — will apply on next client check-in.';
             statusEl.className = 'config-status success';
-            setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'config-status'; }, 4000);
+            setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'config-status'; }, 7000);
         }
     })
     .catch(err => {
@@ -384,7 +415,7 @@ function openAddClientModal() {
     document.getElementById('addIpAddress').value = '';
     document.getElementById('addPassword').value = '';
     document.getElementById('addClientError').textContent = '';
-    _setAddLoading(false);
+    set_add_loading(false);
     document.getElementById('addClientModal').classList.add('active');
     document.getElementById('addUsername').focus();
 }
@@ -394,7 +425,7 @@ function closeAddClientModal() {
     document.getElementById('addClientModal').classList.remove('active');
 }
 
-function _setAddLoading(loading) {
+function set_add_loading(loading) {
     document.getElementById('addSubmitBtn').disabled = loading;
     document.getElementById('addCancelBtn').disabled = loading;
     document.getElementById('addBtnLabel').style.display = loading ? 'none' : '';
@@ -411,7 +442,7 @@ function submitAddClient() {
     if (!ip_address) { errorEl.textContent = 'Client IP is required.'; return; }
     if (!password) { errorEl.textContent = 'Password is required.'; return; }
     errorEl.textContent = '';
-    _setAddLoading(true);
+    set_add_loading(true);
 
     fetch('/api/v1/clients/admin/add', {
         method: 'POST',
@@ -420,24 +451,24 @@ function submitAddClient() {
     })
     .then(r => r.json())
     .then(data => {
-        _setAddLoading(false);
+        set_add_loading(false);
         if (data.error) { errorEl.textContent = data.error; return; }
         location.reload();
     })
     .catch(err => {
-        _setAddLoading(false);
+        set_add_loading(false);
         errorEl.textContent = 'Error: ' + err.message;
     });
 }
 
 // ── Delete Client Modal ───────────────────────────────────────
 function openDeleteClientModal() {
-    if (!_activeClientId) return;
+    if (!active_client_id) return;
     document.getElementById('deleteClientMsg').textContent =
-        `Are you sure you want to delete client "${_activeClientName}"? This will SSH into the machine and uninstall the service.`;
+        `Are you sure you want to delete client "${active_client_name}"? This will SSH into the machine and uninstall the service.`;
     document.getElementById('deletePassword').value = '';
     document.getElementById('deleteClientError').textContent = '';
-    _setDeleteLoading(false);
+    set_delete_loading(false);
     document.getElementById('deleteClientModal').classList.add('active');
     document.getElementById('deletePassword').focus();
 }
@@ -447,7 +478,7 @@ function closeDeleteClientModal() {
     document.getElementById('deleteClientModal').classList.remove('active');
 }
 
-function _setDeleteLoading(loading) {
+function set_delete_loading(loading) {
     document.getElementById('deleteSubmitBtn').disabled = loading;
     document.getElementById('deleteCancelBtn').disabled = loading;
     document.getElementById('deleteBtnLabel').style.display = loading ? 'none' : '';
@@ -455,34 +486,91 @@ function _setDeleteLoading(loading) {
 }
 
 function confirmDeleteClient() {
-    if (!_activeClientId) return;
+    if (!active_client_id) return;
     const password = document.getElementById('deletePassword').value;
     const errorEl = document.getElementById('deleteClientError');
 
     if (!password) { errorEl.textContent = 'Password is required.'; return; }
     errorEl.textContent = '';
-    _setDeleteLoading(true);
+    set_delete_loading(true);
 
-    fetch(`/api/v1/clients/admin/${_activeClientId}`, {
+    fetch(`/api/v1/clients/admin/${active_client_id}`, {
         method: 'DELETE',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ password })
     })
     .then(r => r.json())
     .then(data => {
-        _setDeleteLoading(false);
+        set_delete_loading(false);
         if (data.error) { errorEl.textContent = data.error; return; }
         closeDeleteClientModal();
         location.reload();
     })
     .catch(err => {
-        _setDeleteLoading(false);
+        set_delete_loading(false);
         errorEl.textContent = 'Delete failed: ' + err.message;
     });
 }
 
+// ── Real-time stat card + status badge updates ────────────────
+function fmt_uptime(seconds) {
+    if (seconds == null) return '—';
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+}
+
+function update_stat_cards(clientId, rows) {
+    if (!rows || rows.length === 0) return;
+    const latest = rows[rows.length - 1];
+    const t = latest.telemetry || {};
+
+    const setText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && val != null) el.textContent = val;
+    };
+
+    setText(`stat-cpu-${clientId}`,   t.cpu_percent    != null ? `${t.cpu_percent}%`    : null);
+    setText(`stat-mem-${clientId}`,   t.memory_percent != null ? `${t.memory_percent}%` : null);
+    setText(`stat-disk-${clientId}`,  t.disk_usage     != null ? `${t.disk_usage}%`     : null);
+    setText(`stat-procs-${clientId}`, t.process_count  != null ? t.process_count        : null);
+    setText(`stat-uptime-${clientId}`, t.uptime_seconds != null ? fmt_uptime(t.uptime_seconds) : null);
+
+    // Update panel status badge based on how recent the latest telemetry is
+    const ageMs = latest.timestamp ? Date.now() - new Date(latest.timestamp).getTime() : Infinity;
+    const status = ageMs <= 600000 ? 'online' : 'offline';
+    const badge = document.getElementById(`panel-status-badge-${clientId}`);
+    const dot   = document.getElementById(`panel-status-dot-${clientId}`);
+    const txt   = document.getElementById(`panel-status-text-${clientId}`);
+    if (badge) badge.className = `panel-status-badge ${status}`;
+    if (dot)   dot.className   = `status-dot ${status}`;
+    if (txt)   txt.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+// ── Client list status poll (runs continuously) ───────────────
+function poll_client_list_status() {
+    fetch('/api/v1/web/dashboard/clients/status')
+        .then(r => r.json())
+        .then(data => {
+            (data.clients || []).forEach(c => {
+                const dot = document.getElementById(`list-dot-${c.client_id}`);
+                if (dot) dot.className = `status-dot ${c.is_online ? 'online' : 'offline'}`;
+                const ls = document.getElementById(`list-lastseen-${c.client_id}`);
+                if (ls) ls.textContent = c.last_seen;
+            });
+        })
+        .catch(() => {});
+}
+
 // ── Event listeners (deferred until DOM is ready) ─────────────
 document.addEventListener('DOMContentLoaded', function () {
+    // Start client list status poll immediately and repeat every 60 s
+    poll_client_list_status();
+    setInterval(poll_client_list_status, 60000);
+
     document.getElementById('clientSearch')?.addEventListener('input', function () {
         const q = this.value.toLowerCase();
         document.querySelectorAll('.client-item').forEach(el => {

@@ -23,15 +23,15 @@ REPO_ROOT = os.path.abspath(
 BUNDLE_DIR = os.path.join(REPO_ROOT, 'dist', 'capcan-client-bundle')
 BUILD_SCRIPT = os.path.join(REPO_ROOT, 'scripts', 'build_client.sh')
 
-_build_lock = threading.Lock()
-_build_status: dict = {'state': 'idle', 'message': 'Not yet started'}
+build_lock = threading.Lock()
+build_status: dict = {'state': 'idle', 'message': 'Not yet started'}
 
 # Persisted across build threads so settings.yaml is written correctly after a build.
-_bundle_demo_mode: bool = False
-_bundle_demo_alerts_per_hour: int = 20
+bundle_demo_mode: str = "false"
+bundle_demo_alerts_per_hour: int = 20
 
 
-def write_bundle_settings(demo_mode: bool = False, demo_alerts_per_hour: int = 20) -> None:
+def write_bundle_settings(demo_mode: str = "false", demo_alerts_per_hour: int = 20) -> None:
     """
     Write settings.yaml into the bundle directory.
 
@@ -40,82 +40,103 @@ def write_bundle_settings(demo_mode: bool = False, demo_alerts_per_hour: int = 2
     The deployer uploads all files in BUNDLE_DIR, so this file is included
     automatically whenever a client is deployed.
     """
-    global _bundle_demo_mode, _bundle_demo_alerts_per_hour
-    _bundle_demo_mode = demo_mode
-    _bundle_demo_alerts_per_hour = demo_alerts_per_hour
+    global bundle_demo_mode, bundle_demo_alerts_per_hour
+    bundle_demo_mode = demo_mode
+    bundle_demo_alerts_per_hour = demo_alerts_per_hour
 
     os.makedirs(BUNDLE_DIR, exist_ok=True)
-    settings = {
+    settings = { # Keep in sync with scripts/build_client.sh and client_main.py
         'demo_mode': demo_mode,
         'demo_alerts_per_hour': demo_alerts_per_hour,
-        'interval': 300,
+        'interval': 120,
         'collect': {
             'cpu': True,
             'memory': True,
             'disk': True,
             'network': True,
             'processes': True,
+            'temperatures': True,
+            'top_processes': True,
+        },
+        'watchers': {
+            'file_integrity': True,
+            'process': True,
+            'network': True,
+            'login': True,
+            'service': True,
         },
     }
     with open(os.path.join(BUNDLE_DIR, 'settings.yaml'), 'w') as fh:
         yaml.dump(settings, fh, default_flow_style=False, sort_keys=False)
     print(
-        f'[deployer] settings.yaml written '
+        f'[DEPLOYER] settings.yaml written '
         f'(demo_mode={demo_mode}, demo_alerts_per_hour={demo_alerts_per_hour})'
     )
 
 
 def get_build_status() -> dict:
-    return _build_status.copy()
+    return build_status.copy()
 
 
 # ── Background build ──────────────────────────────────────────────────────────
 
-def _do_build(server_ip: str, server_port: int) -> None:
-    global _build_status
-    with _build_lock:
-        _build_status = {'state': 'building', 'message': 'Building client bundle…'}
+def _do_build(server_ip: str, server_port: int, demo_mode: bool = False) -> None:
+    global build_status
+    with build_lock:
+        build_status = {'state': 'building', 'message': 'Building client bundle…'}
         try:
+            cmd = ['bash', BUILD_SCRIPT, server_ip, str(server_port)]
+            if demo_mode:
+                cmd.append('--demo')
             result = subprocess.run(
-                ['bash', BUILD_SCRIPT, server_ip, str(server_port)],
+                cmd,
                 capture_output=True, text=True, timeout=300, cwd=REPO_ROOT,
             )
             if result.returncode == 0:
-                _build_status = {'state': 'ready', 'message': 'Bundle ready'}
+                build_status = {'state': 'ready', 'message': 'Bundle ready'}
                 _refresh_base_config(server_ip, server_port)
-                write_bundle_settings(_bundle_demo_mode, _bundle_demo_alerts_per_hour)
+                write_bundle_settings(bundle_demo_mode, bundle_demo_alerts_per_hour)
             else:
-                _build_status = {
+                build_status = {
                     'state': 'error',
                     'message': result.stderr.strip() or 'Build failed — check server logs.',
                 }
         except subprocess.TimeoutExpired:
-            _build_status = {'state': 'error', 'message': 'Build timed out after 300 s.'}
+            build_status = {'state': 'error', 'message': 'Build timed out after 300 s.'}
         except Exception as exc:
-            _build_status = {'state': 'error', 'message': str(exc)}
+            build_status = {'state': 'error', 'message': str(exc)}
 
 
-def ensure_bundle(server_ip: str, server_port: int) -> None:
+def ensure_bundle(server_ip: str, server_port: int, demo_mode: bool = False) -> None:
     """
     Called once at server startup.
-    - If the binary already exists, refresh config.yaml with the current server URL.
-    - Otherwise, kick off a background build thread.
+    - If the binary already exists and the demo binary is present (when required),
+      refresh config.yaml with the current server URL.
+    - If the binary is missing, or demo mode is active but demo_attack_sim is absent,
+      kick off a background build thread.
     Guards against double-invocation (e.g. Flask debug reloader).
     """
-    global _build_status
+    global build_status
 
-    with _build_lock:
-        if _build_status['state'] == 'building':
+    with build_lock:
+        if build_status['state'] == 'building':
             return  # already running, skip duplicate call
 
     bundle_binary = os.path.join(BUNDLE_DIR, 'capcan-client')
+    demo_binary   = os.path.join(BUNDLE_DIR, 'demo_attack_sim')
+
     if os.path.exists(bundle_binary):
+        if demo_mode and not os.path.exists(demo_binary):
+            print(
+                f'[DEPLOYER] Demo mode active but demo_attack_sim missing — '
+                f'treating as non-demo run (script-based attacks unavailable)'
+            )
         _refresh_base_config(server_ip, server_port)
-        _build_status = {'state': 'ready', 'message': 'Bundle ready'}
-        print(f'[deployer] Bundle found — config refreshed for http://{server_ip}:{server_port}')
+        build_status = {'state': 'ready', 'message': 'Bundle ready'}
+        print(f'[DEPLOYER] Bundle found — config refreshed for http://{server_ip}:{server_port}')
     else:
-        print(f'[deployer] Bundle not found — building in background for http://{server_ip}:{server_port}')
-        t = threading.Thread(target=_do_build, args=(server_ip, server_port), daemon=True)
+        print(f'[DEPLOYER] Bundle not found — building in background for http://{server_ip}:{server_port}')
+        t = threading.Thread(target=_do_build, args=(server_ip, server_port, demo_mode), daemon=True)
         t.start()
 
 
@@ -157,7 +178,7 @@ def deploy_client(
 
     Returns (success: bool, message: str, real_hostname: str | None).
     """
-    state = _build_status.get('state')
+    state = build_status.get('state')
     if state == 'building':
         return False, 'Client bundle is still building — please wait and try again.', None
     if state != 'ready':

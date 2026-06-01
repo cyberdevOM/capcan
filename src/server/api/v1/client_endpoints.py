@@ -25,9 +25,6 @@ import uuid
 from typing import Dict, Any
 from ...core.database import Database
 
-# Create a persistent Database instance for API handlers
-database = Database()
-
 # Import security validators
 from ...utils.validators import (
     validate_timestamp,
@@ -49,53 +46,44 @@ def generate_secret_key() -> str:
 def validate_client_request(client_id: str) -> tuple[bool, Dict[str, any], int]:
     """
     Common validation logic for auth client requests.
-
-    Args:
-        client_id (str): UUID of the client making the request.
-    Returns:
-        tuple: (is_valid (bool), response (dict), status_code (int))
-        - If validation fails: (False, error_dict, 401-404)
-        - If validation succeeds: (True, {}, 200)
+    NOTE: Opens and closes its own DB connection.
     """
 
     headers_client_id, timestamp, signature = extract_security_headers(request.headers)
 
-    # check all headers present
     if not headers_client_id:
         return False, {"error": "Missing security headers (X-Client-ID, X-Timestamp, X-Signature)"}, 401
-    
-    # check client ID matches URL
+
     if headers_client_id != client_id:
         return False, {"error": "Client ID mismatch between URL and headers"}, 403
-    
-    # check client exists
-    #! REPLACED WITH DATABASE CALL TO SEE IF CLIENT ID MATCHES CLIENT
-    if not database.get_client_by_id(client_id):
-        return False, {"error": "Client ID Does not exist"}
 
-    # validate timestamp and signature
-    valid_time, time_errror = validate_timestamp(timestamp)
-    if not valid_time:
-        return False, {"error": f"Invalid timestamp: {time_errror}"}, 401
-    
-    # get client secret from database
-    secret_key = database.get_client_secret(client_id)
-    if not secret_key:
-        return False, {"error": "Client secret not found - re-register required"}, 401
-    
-    valid_sig, sig_error = validate_signature(
-        client_id=client_id,
-        timestamp=timestamp,
-        body=request.get_data(),
-        received_signature=signature,
-        secret_key=secret_key
-    )
+    db = Database()
+    try:
+        if not db.get_client_by_id(client_id):
+            return False, {"error": "Client ID Does not exist"}, 404
 
-    if not valid_sig:
-        return False, {"error": f"Invalid signature: {sig_error}"}, 401
-    
-    # NOTE: do not close the shared Database instance here; other handlers may reuse it
-    return True, {}, 200
+        valid_time, time_errror = validate_timestamp(timestamp)
+        if not valid_time:
+            return False, {"error": f"Invalid timestamp: {time_errror}"}, 401
+
+        secret_key = db.get_client_secret(client_id)
+        if not secret_key:
+            return False, {"error": "Client secret not found - re-register required"}, 401
+
+        valid_sig, sig_error = validate_signature(
+            client_id=client_id,
+            timestamp=timestamp,
+            body=request.get_data(),
+            received_signature=signature,
+            secret_key=secret_key
+        )
+
+        if not valid_sig:
+            return False, {"error": f"Invalid signature: {sig_error}"}, 401
+
+        return True, {}, 200
+    finally:
+        db.close()
 
 
 # ================ Remote Config Push ==================
@@ -168,7 +156,8 @@ def push_client_config():
         return jsonify({"error": "'settings' must be an object"}), 400
 
     # Validate settings fields
-    allowed_collect_keys = {"cpu", "memory", "disk", "network", "processes"}
+    allowed_collect_keys = {"cpu", "memory", "disk", "network", "processes", "temperatures", "top_processes"}
+    allowed_watcher_keys = {"file_integrity", "process", "network", "login", "service"}
     if "interval" in settings:
         try:
             interval = int(settings["interval"])
@@ -188,6 +177,16 @@ def push_client_config():
         for k, v in settings["collect"].items():
             if not isinstance(v, bool):
                 return jsonify({"error": f"collect.{k} must be a boolean"}), 400
+
+    if "watchers" in settings:
+        if not isinstance(settings["watchers"], dict):
+            return jsonify({"error": "'watchers' must be an object"}), 400
+        unknown = set(settings["watchers"]) - allowed_watcher_keys
+        if unknown:
+            return jsonify({"error": f"Unknown watcher keys: {', '.join(unknown)}"}), 400
+        for k, v in settings["watchers"].items():
+            if not isinstance(v, bool):
+                return jsonify({"error": f"watchers.{k} must be a boolean"}), 400
 
     # Strip any keys that must not be remotely configurable
     for forbidden in ("server_url", "client_id", "secret_key"):
@@ -264,7 +263,11 @@ def register_client():
         current_time = dt.datetime.now(dt.timezone.utc)
 
         # Persist client record (client_secret stored with client data)
-        database.register_client(client_id, data["hostname"], data["platform"], secret_key)
+        db = Database()
+        try:
+            db.register_client(client_id, data["hostname"], data["platform"], secret_key)
+        finally:
+            db.close()
 
         # Return success response
         # This is the only time we return the secret key

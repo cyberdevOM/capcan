@@ -33,14 +33,14 @@ function showRoleFeedback(el, msg, success) {
     if (!el) return;
     el.textContent = msg;
     el.className = 'user-role-feedback ' + (success ? 'feedback-ok' : 'feedback-err');
-    clearTimeout(el._t);
-    el._t = setTimeout(() => { el.textContent = ''; el.className = 'user-role-feedback'; }, 3000);
+    clearTimeout(el.dismiss_timer);
+    el.dismiss_timer = setTimeout(() => { el.textContent = ''; el.className = 'user-role-feedback'; }, 3000);
 }
 
 // ── Add User modal ────────────────────────────────────────────────────────────
 
 function openAddUserModal() {
-    _resetAddUserModal();
+    reset_add_user_modal();
     document.getElementById('addUserModal').classList.add('active');
     document.getElementById('modal-username').focus();
 }
@@ -53,19 +53,19 @@ function handleAddUserOverlayClick(e) {
     if (e.target === document.getElementById('addUserModal')) closeAddUserModal();
 }
 
-function _resetAddUserModal() {
+function reset_add_user_modal() {
     ['modal-username', 'modal-email', 'modal-password', 'modal-confirm'].forEach(id => {
         document.getElementById(id).value = '';
     });
     document.getElementById('modal-role').value = 'read-only';
     ['modal-username-error', 'modal-email-error', 'modal-password-error', 'modal-confirm-error'].forEach(id => {
-        _modalFieldError(id, '');
+        modal_field_error(id, '');
     });
     document.getElementById('modal-feedback').textContent = '';
     document.getElementById('addUserSubmitBtn').disabled = false;
 }
 
-function _modalFieldError(id, msg) {
+function modal_field_error(id, msg) {
     const el = document.getElementById(id);
     if (!el) return;
     el.textContent = msg;
@@ -80,35 +80,35 @@ async function submitAddUser() {
     const role     = document.getElementById('modal-role').value;
 
     let valid = true;
-    _modalFieldError('modal-username-error', '');
-    _modalFieldError('modal-email-error', '');
-    _modalFieldError('modal-password-error', '');
-    _modalFieldError('modal-confirm-error', '');
+    modal_field_error('modal-username-error', '');
+    modal_field_error('modal-email-error', '');
+    modal_field_error('modal-password-error', '');
+    modal_field_error('modal-confirm-error', '');
 
     if (!username) {
-        _modalFieldError('modal-username-error', 'Username is required.');
+        modal_field_error('modal-username-error', 'Username is required.');
         valid = false;
     }
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) {
-        _modalFieldError('modal-email-error', 'Email is required.');
+        modal_field_error('modal-email-error', 'Email is required.');
         valid = false;
     } else if (!emailPattern.test(email)) {
-        _modalFieldError('modal-email-error', 'Please enter a valid email address.');
+        modal_field_error('modal-email-error', 'Please enter a valid email address.');
         valid = false;
     }
 
     if (!password) {
-        _modalFieldError('modal-password-error', 'Password is required.');
+        modal_field_error('modal-password-error', 'Password is required.');
         valid = false;
     }
 
     if (!confirm) {
-        _modalFieldError('modal-confirm-error', 'Please confirm your password.');
+        modal_field_error('modal-confirm-error', 'Please confirm your password.');
         valid = false;
     } else if (password && password !== confirm) {
-        _modalFieldError('modal-confirm-error', 'Passwords do not match.');
+        modal_field_error('modal-confirm-error', 'Passwords do not match.');
         valid = false;
     }
 

@@ -26,6 +26,18 @@ def _collect_toggle(client_id: str, key: str, label: str, effective: dict) -> st
     )
 
 
+def _watcher_toggle(client_id: str, key: str, label: str, effective: dict) -> str:
+    """Render a single watcher toggle checkbox."""
+    watchers = effective.get("watchers", {})
+    checked = "checked" if watchers.get(key, True) else ""
+    return (
+        f'<label class="toggle-label">'
+        f'<input type="checkbox" class="watcher-toggle" '
+        f'id="cfg-w-{key}-{client_id}" {checked}> {label}'
+        f'</label>'
+    )
+
+
 def render_client_list(user_role='read-only'):
     """Render the complete client list with multi-select checkboxes."""
     clients = _fetch_clients()
@@ -73,7 +85,7 @@ def render_client_list(user_role='read-only'):
         <div class="client-item" data-client-id="{cid}" onclick="selectClient('{cid}')">
             {checkbox_html}
             <div class="client-status">
-                <span class="status-dot {status}"></span>
+                <span class="status-dot {status}" id="list-dot-{cid}"></span>
             </div>
             <div class="client-icon">
                 <i class="{icon}"></i>
@@ -81,7 +93,7 @@ def render_client_list(user_role='read-only'):
             <div class="client-info">
                 <div class="client-id">{c['hostname']}</div>
                 <div class="client-platform">{platform_line}</div>
-                <div class="client-last-seen">{last_seen}</div>
+                <div class="client-last-seen" id="list-lastseen-{cid}">{last_seen}</div>
             </div>
             <div class="client-actions">
                 <i class="fas fa-chevron-right"></i>
@@ -151,23 +163,24 @@ def render_client_details(client_id=None, user_role='read-only'):
         if pending_count > 0 else ''
     )
 
-    def stat_card(icon_cls, label, value, unit=""):
+    def stat_card(icon_cls, label, value, unit="", stat_id=""):
         val_str = f"{value}{unit}" if isinstance(value, (int, float)) else str(value)
+        id_attr = f' id="{stat_id}"' if stat_id else ''
         return f"""
         <div class="stat-card">
             <div class="stat-icon"><i class="{icon_cls}"></i></div>
             <div class="stat-info">
                 <div class="stat-label">{label}</div>
-                <div class="stat-value">{val_str}</div>
+                <div class="stat-value"{id_attr}>{val_str}</div>
             </div>
         </div>"""
 
     stats_html = (
-        stat_card("fas fa-microchip", "CPU", cpu, "%" if isinstance(cpu, (int, float)) else "") +
-        stat_card("fas fa-memory", "Memory", mem, "%" if isinstance(mem, (int, float)) else "") +
-        stat_card("fas fa-hdd", "Disk", disk, "%" if isinstance(disk, (int, float)) else "") +
-        stat_card("fas fa-clock", "Uptime", uptime_disp) +
-        stat_card("fas fa-tasks", "Processes", procs)
+        stat_card("fas fa-microchip", "CPU", cpu, "%" if isinstance(cpu, (int, float)) else "", f"stat-cpu-{cid}") +
+        stat_card("fas fa-memory", "Memory", mem, "%" if isinstance(mem, (int, float)) else "", f"stat-mem-{cid}") +
+        stat_card("fas fa-hdd", "Disk", disk, "%" if isinstance(disk, (int, float)) else "", f"stat-disk-{cid}") +
+        stat_card("fas fa-clock", "Uptime", uptime_disp, "", f"stat-uptime-{cid}") +
+        stat_card("fas fa-tasks", "Processes", procs, "", f"stat-procs-{cid}")
     )
 
     can_config = user_role in ('admin', 'super-admin', 'analyst')
@@ -185,11 +198,23 @@ def render_client_details(client_id=None, user_role='read-only'):
         <div class="config-row">
             <label class="config-label">Collect</label>
             <div class="config-toggles">
-                {_collect_toggle(cid, 'cpu',       'CPU',       effective_settings)}
-                {_collect_toggle(cid, 'memory',    'Memory',    effective_settings)}
-                {_collect_toggle(cid, 'disk',      'Disk',      effective_settings)}
-                {_collect_toggle(cid, 'network',   'Network',   effective_settings)}
-                {_collect_toggle(cid, 'processes', 'Processes', effective_settings)}
+                {_collect_toggle(cid, 'cpu',           'CPU',          effective_settings)}
+                {_collect_toggle(cid, 'memory',        'Memory',       effective_settings)}
+                {_collect_toggle(cid, 'disk',          'Disk',         effective_settings)}
+                {_collect_toggle(cid, 'network',       'Network',      effective_settings)}
+                {_collect_toggle(cid, 'processes',     'Processes',    effective_settings)}
+                {_collect_toggle(cid, 'temperatures',  'Temperatures', effective_settings)}
+                {_collect_toggle(cid, 'top_processes', 'Top Procs',    effective_settings)}
+            </div>
+        </div>
+        <div class="config-row">
+            <label class="config-label">Watchers</label>
+            <div class="config-toggles">
+                {_watcher_toggle(cid, 'file_integrity', 'File Integrity', effective_settings)}
+                {_watcher_toggle(cid, 'process',        'Process',        effective_settings)}
+                {_watcher_toggle(cid, 'network',        'Network',        effective_settings)}
+                {_watcher_toggle(cid, 'login',          'Login',          effective_settings)}
+                {_watcher_toggle(cid, 'service',        'Service',        effective_settings)}
             </div>
         </div>
         <div class="config-actions">
@@ -242,9 +267,9 @@ def render_client_details(client_id=None, user_role='read-only'):
                     <h2 class="panel-hostname">{c['hostname']}</h2>
                     <span class="panel-subtitle">{subtitle}</span>
                 </div>
-                <span class="panel-status-badge {status}">
-                    <span class="status-dot {status}"></span>
-                    {status.title()}
+                <span class="panel-status-badge {status}" id="panel-status-badge-{cid}">
+                    <span class="status-dot {status}" id="panel-status-dot-{cid}"></span>
+                    <span id="panel-status-text-{cid}">{status.title()}</span>
                 </span>
             </div>
             <div class="panel-header-actions">

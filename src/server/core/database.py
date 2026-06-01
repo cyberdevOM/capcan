@@ -37,16 +37,15 @@ class Database:
                 password=os.getenv("DB_PASSWORD"),
             )
             self.cursor = self.conn.cursor()
-            print("Database connection established successfully.")
+            #print("[DEBUG] Database connection established successfully.")
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
-            print("Failed to establish database connection.")
+            print(f"[ERROR] Failed to establish database connection: {error}")
 
     def close(self):
         if self.conn:
             self.cursor.close()  # closes the cursor
             self.conn.close()  # closes the database connection
-            print("Database connection closed.")
+            #print("[DEBUG] Database connection closed.")
 
     # ============== WEB USER MANAGEMENT ==============
     # Role to permissions mapping
@@ -70,12 +69,11 @@ class Database:
                 (user_id, username, pass_hash),
             )
             self.conn.commit()
-            print(f"Web user '{username}' created successfully.")
+            #print(f"[DEBUG] Web user '{username}' created successfully.")
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to create web user '{username}': {error}")
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to create web user '{username}'.")
 
         try:
             self.cursor.execute(
@@ -83,62 +81,31 @@ class Database:
                 (user_id, email, username, is_admin, role, permissions),
             )
             self.conn.commit()
-            print(f"User permissions for '{username}' created successfully.")
+            #print(f"[DEBUG] User permissions for '{username}' created successfully.")
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to create user permissions for '{username}': {error}")
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to create user permissions for '{username}'.")
-
-    def migrate_role_enum(self):
-        """Ensure 'super-admin' exists in the PostgreSQL ROLE enum.
-
-        ALTER TYPE ADD VALUE cannot run inside a transaction block, so we
-        commit any pending work, switch to autocommit, run the DDL, then
-        restore the previous autocommit setting.
-        """
-        try:
-            self.cursor.execute(
-                "SELECT 1 FROM pg_enum e "
-                "JOIN pg_type t ON e.enumtypid = t.oid "
-                "WHERE t.typname = 'role' AND e.enumlabel = 'super-admin'"
-            )
-            if self.cursor.fetchone():
-                return  # already present — nothing to do
-            self.conn.commit()
-            self.conn.autocommit = True
-            self.cursor.execute("ALTER TYPE ROLE ADD VALUE 'super-admin'")
-            self.conn.autocommit = False
-            print("ROLE enum: 'super-admin' value added.")
-        except Exception as error:
-            print(f"migrate_role_enum error: {error}")
-            try:
-                self.conn.autocommit = False
-                self.conn.rollback()
-            except Exception:
-                pass
 
     def create_default_web_user(self):
         load_env()
-        self.migrate_role_enum()
         default_username = os.getenv("WEB_DEFAULT_USER")
         default_password = os.getenv("WEB_DEFAULT_PASSWORD")
         default_email = os.getenv("WEB_DEFAULT_EMAIL")
         default_exists = self.get_web_user(default_username)
-        print(default_exists)
         if default_username and default_password and default_email and not default_exists:
-            print(f"Creating default web user '{default_username}'...")
+            #print(f"[DEBUG] Creating default web user '{default_username}'...")
             client_hash = pre_hash_client_password(default_password)
             pass_hash = hash_password(client_hash)
             try:
                 self.create_web_user(default_username, pass_hash, default_email, role='super-admin')
             except (psycopg2.DatabaseError, Exception) as error:
-                print(error)
+                print(f"[ERROR] Failed to create default web user '{default_username}': {error}")
                 if self.conn:
                     self.conn.rollback()
-                print(f"Failed to create default web user '{default_username}'.")
         else:
-            print(f"Default web user '{default_username}' already exists or environment variables are not set.")
+            #print(f"[DEBUG] Default web user '{default_username}' already exists or environment variables are not set.")
+            return
 
     def update_web_user(self, user_id, email=None, display_name=None, role=None, permissions=None):
         try:
@@ -160,25 +127,23 @@ class Database:
                     (display_name, user_id)
                 )
             self.conn.commit()
-            print(f"Web user '{user_id}' updated successfully.")
+            #print(f"[DEBUG] Web user '{user_id}' updated successfully.")
             return True
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to update web user '{user_id}': {error}")
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to update web user '{user_id}'.")
             return False
 
     def delete_web_user(self, user_id):
         try:
             self.cursor.execute("DELETE FROM auth WHERE user_id = %s;", (user_id,))
             self.conn.commit()
-            print(f"Web user with user_id '{user_id}' deleted successfully.")
+            #print(f"[DEBUG] Web user with user_id '{user_id}' deleted successfully.")
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to delete web user with user_id '{user_id}': {error}")
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to delete web user with user_id '{user_id}'.")
 
     def get_web_user_id(self, username):
         try:
@@ -186,7 +151,7 @@ class Database:
             result = self.cursor.fetchone()
             return result[0] if result else None
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve web user ID for username '{username}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -196,7 +161,7 @@ class Database:
             self.cursor.execute("SELECT * FROM user_permissions WHERE display_name = %s", (username,))
             return self.cursor.fetchone()
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve web user for username '{username}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -213,7 +178,7 @@ class Database:
             else:
                 return None
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve user auth for username '{username}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -231,7 +196,7 @@ class Database:
             row = self.cursor.fetchone()
             return dict(zip(self._USER_COLS, row)) if row else None
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve web user by ID '{user_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -246,7 +211,7 @@ class Database:
             rows = self.cursor.fetchall()
             return [dict(zip(self._USER_COLS, row)) for row in rows]
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve all web users: {error}")
             if self.conn:
                 self.conn.rollback()
             return []
@@ -283,7 +248,7 @@ class Database:
         except (psycopg2.DatabaseError, Exception) as error:
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to register client '{hostname}': {error}")
+            print(f"[ERROR] Failed to register client '{hostname}': {error}")
             raise  # Re-raise the exception for duplicate key or other constraint violations
 
     def revoke_client(self, client_id: str):
@@ -297,10 +262,9 @@ class Database:
             print(f"Client with client_id '{client_id}' revoked successfully.")
             return True
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to revoke client with client_id '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to revoke client with client_id '{client_id}'.")
             return False
 
     def update_client(
@@ -336,10 +300,9 @@ class Database:
             print(f"Client '{client_id}' updated successfully.")
             return True
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to update client '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to update client '{client_id}'.")
             return False
 
     def update_client_hostname_os(self, client_id: str, hostname: str, client_os: str):
@@ -352,7 +315,7 @@ class Database:
             self.conn.commit()
             return True
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to update hostname/os for '{client_id}': {error}")
+            print(f"[ERROR] Failed to update hostname/os for '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -371,7 +334,7 @@ class Database:
             self.conn.commit()
             return True
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to update client os/hostname for '{client_id}': {error}")
+            print(f"[ERROR] Failed to update client os/hostname for '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -383,13 +346,12 @@ class Database:
         try:
             self.cursor.execute(query, (client_id,))
             self.conn.commit()
-            print(f"Client with client_id '{client_id}' deleted successfully.")
+            #print(f"[INFO] Client with client_id '{client_id}' deleted successfully.")
             return True
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to delete client with client_id '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
-            print(f"Failed to delete client with client_id '{client_id}'.")
             return False
 
     def get_client_id(
@@ -413,11 +375,8 @@ class Database:
             result = self.cursor.fetchone()
             return result[0] if result else None
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve client_id: {error}")
             return None
-
-    def get_many_clients(self, filter_params: dict):
-        pass  # retrieve multiple clients based on filter parameters like OS, registration date, etc.
 
     def get_client_by_id(self, client_id: str = None):
         query = """
@@ -427,7 +386,7 @@ class Database:
             self.cursor.execute(query, (client_id,))
             return self.cursor.fetchone()
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve client by id '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -440,7 +399,7 @@ class Database:
             self.cursor.execute(query)
             return self.cursor.fetchall()
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve all clients: {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -457,7 +416,7 @@ class Database:
             else:
                 return None
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve client secret for client_id '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -474,7 +433,7 @@ class Database:
                 return None
             return {'ip_address': row[0], 'ssh_user': row[1]}
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve deploy info for client '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -504,7 +463,7 @@ class Database:
             self.conn.commit()
             return telemetry_id
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to store telemetry for client '{client_id}': {error}")
+            print(f"[ERROR] Failed to store telemetry for client '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -524,7 +483,7 @@ class Database:
             rows = self.cursor.fetchall()
             return [{"telemetry": row[0], "timestamp": row[1].isoformat()} for row in rows]
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to get telemetry for client '{client_id}': {error}")
+            print(f"[ERROR] Failed to get telemetry for client '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return []
@@ -544,7 +503,7 @@ class Database:
                 return {"telemetry": row[0], "timestamp": row[1]}
             return None
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to get latest telemetry for client '{client_id}': {error}")
+            print(f"[ERROR] Failed to get latest telemetry for client '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -557,7 +516,7 @@ class Database:
             )
             return [row[0] for row in self.cursor.fetchall()]
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to get active client IDs: {error}")
+            print(f"[ERROR] Failed to get active client IDs: {error}")
             if self.conn:
                 self.conn.rollback()
             return []
@@ -583,7 +542,7 @@ class Database:
             rows = self.cursor.fetchall()
             return [dict(zip(cols, row)) for row in rows]
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to get clients with status: {error}")
+            print(f"[ERROR] Failed to get clients with status: {error}")
             if self.conn:
                 self.conn.rollback()
             return []
@@ -688,7 +647,7 @@ class Database:
                 self.cursor.execute(query, (client_id, limit))
             return self.cursor.fetchall()
         except (psycopg2.DatabaseError, Exception) as error:
-            print(error)
+            print(f"[ERROR] Failed to retrieve alerts for client_id '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return []
@@ -733,7 +692,7 @@ class Database:
             self.cursor.execute(query, params)
             return [dict(zip(cols, row)) for row in self.cursor.fetchall()]
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to get all alerts: {error}")
+            print(f"[ERROR] Failed to get all alerts: {error}")
             if self.conn:
                 self.conn.rollback()
             return []
@@ -747,7 +706,7 @@ class Database:
             row = self.cursor.fetchone()
             return int(row[0]) if row else 0
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to get unresolved alert count: {error}")
+            print(f"[ERROR] Failed to get unresolved alert count: {error}")
             if self.conn:
                 self.conn.rollback()
             return 0
@@ -768,7 +727,7 @@ class Database:
             self.conn.commit()
             return self.cursor.rowcount > 0
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to acknowledge alert '{alert_id}': {error}")
+            print(f"[ERROR] Failed to acknowledge alert '{alert_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -787,7 +746,7 @@ class Database:
             self.conn.commit()
             return self.cursor.rowcount > 0
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to resolve alert '{alert_id}': {error}")
+            print(f"[ERROR] Failed to resolve alert '{alert_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -835,7 +794,7 @@ class Database:
                 )
                 count += 1
             except (psycopg2.DatabaseError, Exception) as error:
-                print(f"Failed to set pending config for client '{cid}': {error}")
+                print(f"[ERROR] Failed to set pending config for client '{cid}': {error}")
                 if self.conn:
                     self.conn.rollback()
                 return count
@@ -868,7 +827,7 @@ class Database:
             self.conn.commit()
             return settings  # already a dict (psycopg2 auto-decodes JSONB)
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to deliver pending config for client '{client_id}': {error}")
+            print(f"[ERROR] Failed to deliver pending config for client '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -888,7 +847,7 @@ class Database:
             row = self.cursor.fetchone()
             return row[0] if row else None
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to get effective settings for client '{client_id}': {error}")
+            print(f"[ERROR] Failed to get effective settings for client '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -914,7 +873,7 @@ class Database:
                 return None, False
             return row[0], bool(row[1])
         except (psycopg2.DatabaseError, Exception) as error:
-            print(f"Failed to get latest settings for client '{client_id}': {error}")
+            print(f"[ERROR] Failed to get latest settings for client '{client_id}': {error}")
             if self.conn:
                 self.conn.rollback()
             return None, False
@@ -942,7 +901,7 @@ class Database:
                         cursor.execute(clean_table)
 
             except psycopg2.errors as error:
-                print(error)
+                print(f"[ERROR] Failed to retrieve or clean tables: {error}")
                 if self.conn:
                     self.conn.rollback()
                 print("Failed to retrieve or clean tables.")
@@ -965,17 +924,15 @@ class Database:
                         try:
                             cursor.execute(drop_query)
                         except psycopg2.Error as error:
-                            print(
-                                f"Error occured while dropping table '{table[0]}': {error}"
-                            )
+                            print(f"[ERROR] Error occured while dropping table '{table[0]}': {error}")
 
             except psycopg2.Error as error:
                 if self.conn:
                     self.conn.rollback()
-                print("Failed to retrieve or drop tables.")
+                print("[ERROR] Failed to retrieve or drop tables.")
 
         else:
-            print("Database connection failed. Cannot clean tabels")
+            print("[ERROR] Database connection failed. Cannot clean tables")
 
     def clear_table(self, table):  # util, clear specified table, used in testing.
         try:
@@ -985,7 +942,7 @@ class Database:
         except psycopg2.Error as error:
             if self.conn:
                 self.conn.rollback()
-            print(f"Cleanup failed: {error}")
+            print(f"[ERROR] Cleanup failed for table '{table}': {error}")
 
 
 if __name__ == "__main__":

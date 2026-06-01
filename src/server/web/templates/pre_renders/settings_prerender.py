@@ -93,31 +93,37 @@ def render_configs_settings():
 
 
 def render_demo_settings():
-    """Render the demo mode settings panel."""
+    """Render the demo mode settings panel with a three-way mode selector."""
     html = """
     <div class="settings-section">
         <h3 class="settings-section-title">Demo Mode</h3>
         <div class="setting-item">
             <div class="setting-info">
-                <div class="setting-label">Enable Demo Mode on Clients</div>
+                <div class="setting-label">Simulation Mode</div>
                 <div class="setting-description">
-                    Push demo mode to all active clients. When enabled, clients send
-                    synthetic telemetry data instead of real system metrics. Useful for
-                    presentations and UI demonstrations.
+                    Choose how demo mode operates across all active clients.
+                    Changes are queued and applied on each client&rsquo;s next check-in.
                 </div>
             </div>
             <div class="setting-control">
-                <label class="switch">
-                    <input type="checkbox" id="demoModeToggle">
-                    <span class="slider"></span>
-                </label>
+                <div class="demo-mode-selector" id="demoModeSelector">
+                    <button class="demo-seg-btn active" data-mode="false">
+                        <i class="fas fa-power-off"></i> Off
+                    </button>
+                    <button class="demo-seg-btn" data-mode="simulated">
+                        <i class="fas fa-flask"></i> Simulated
+                    </button>
+                    <button class="demo-seg-btn" data-mode="script">
+                        <i class="fas fa-terminal"></i> Script
+                    </button>
+                </div>
             </div>
         </div>
         <div class="setting-item">
             <div class="setting-info">
                 <div class="setting-label">Demo Alert Rate</div>
                 <div class="setting-description">
-                    Number of synthetic alerts submitted per hour while demo mode is active.
+                    Synthetic alerts per hour (Simulated mode only).
                 </div>
             </div>
             <div class="setting-control" style="gap: 0.5rem; display: flex; align-items: center;">
@@ -130,7 +136,7 @@ def render_demo_settings():
         <div class="setting-item">
             <div class="setting-info">
                 <div class="setting-label">Client Status</div>
-                <div class="setting-description" id="demoStatusText">Loading…</div>
+                <div class="setting-description" id="demoStatusText">Loading&hellip;</div>
             </div>
             <div class="setting-control">
                 <button class="settings-btn settings-btn-secondary" onclick="refreshDemoStatus()">
@@ -141,14 +147,35 @@ def render_demo_settings():
         <span class="settings-feedback" id="demoFeedback"></span>
     </div>
 
-    <div class="settings-section">
-        <h3 class="settings-section-title">About Demo Mode</h3>
+    <!-- Mode description panels — shown/hidden by JS based on selected mode -->
+
+    <div class="settings-section" id="demoInfoSynthetic" style="display: none;">
+        <h3 class="settings-section-title">About Simulated Mode</h3>
         <p class="settings-placeholder-sub" style="padding: 0 0.25rem;">
-            Demo mode replaces live telemetry with realistic synthetic data, allowing
-            you to showcase the dashboard without exposing real infrastructure metrics.
-            Toggling demo mode queues a settings update that each client applies on its
-            next telemetry cycle. Clients that are currently offline will receive the
-            update when they next check in.
+            Simulated mode replaces live telemetry with realistic synthetic data and
+            generates random security alerts at the configured rate. No real system data
+            is collected. Ideal for UI demonstrations without exposing real infrastructure.
+            The setting is queued and applied on each client&rsquo;s next check-in.
+        </p>
+    </div>
+
+    <div class="settings-section" id="demoInfoScript" style="display: none;">
+        <h3 class="settings-section-title">Script Attack Simulation</h3>
+        <p class="settings-placeholder-sub" style="padding: 0 0.25rem 0.4rem;">
+            In script mode, clients collect <strong>real telemetry</strong> from the host
+            OS &mdash; no synthetic data is generated. The <code>demo_attack_sim</code>
+            binary must be running on each target client to produce live CPU spikes, disk
+            writes, file-integrity events, suspicious process names, and rogue TCP
+            listeners that the security watchers will detect and report as real alerts.
+        </p>
+        <p class="settings-placeholder-sub" style="padding: 0 0.25rem 0.4rem;">
+            Run all scenarios for 60 seconds on the target host:
+        </p>
+        <pre class="demo-script-cmd">./demo_attack_sim --all --duration 60</pre>
+        <p class="settings-placeholder-sub" style="padding: 0.4rem 0.25rem 0;">
+            The binary is bundled inside demo client packages (built with
+            <code>build_client.sh --demo</code>). Remote triggering from this dashboard
+            is planned for a future release.
         </p>
     </div>
     """

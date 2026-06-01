@@ -2,14 +2,19 @@
 # build_client.sh — Build the Capcan monitoring client binary.
 #
 # Usage:
-#   ./scripts/build_client.sh [SERVER_IP] [SERVER_PORT]
+#   ./scripts/build_client.sh [SERVER_IP] [SERVER_PORT] [--demo]
 #
 # Outputs a self-contained deployable bundle at:
 #   dist/capcan-client-bundle/
 #     capcan-client          ← standalone binary (no Python needed on target)
 #     config.yaml            ← pre-filled with SERVER_IP:SERVER_PORT, blank credentials
+#     settings.yaml          ← configurable: interval, collect, watchers toggles
 #     install-service.sh     ← optional: installs a systemd service on the target VM
 #     uninstall-service.sh   ← optional: removes the systemd service and all installed files
+#
+# When --demo is passed:
+#   demo_attack_sim.py is included in the bundle and demo_mode is set to true
+#   in settings.yaml. Run it on the target to generate realistic attack traffic.
 #
 # The binary is built for the current machine's architecture (x86_64 Linux).
 # Run this script on a machine with the same arch as your target VMs.
@@ -21,9 +26,18 @@ SERVER_IP="${1:-$(hostname -I | awk '{print $1}')}"
 SERVER_PORT="${2:-5000}"
 BUNDLE_DIR="$REPO_ROOT/dist/capcan-client-bundle"
 
+# Parse optional --demo flag from any position
+DEMO_MODE=false
+for arg in "$@"; do
+    if [ "$arg" = "--demo" ]; then
+        DEMO_MODE=true
+    fi
+done
+
 echo "==> Building Capcan client"
 echo "    Server URL : http://${SERVER_IP}:${SERVER_PORT}"
 echo "    Bundle dir : ${BUNDLE_DIR}"
+echo "    Demo mode  : ${DEMO_MODE}"
 echo ""
 
 # Activate venv if present
@@ -48,18 +62,40 @@ client_id: ''
 secret_key: ''
 YAML
 
-# Write default settings.yaml (remotely configurable via Capcan dashboard)
+# Write settings.yaml — includes all toggles; demo_mode driven by --demo flag
+# Keep in sync with client_main.py and deployer.py
 cat > "$BUNDLE_DIR/settings.yaml" <<YAML
-# Remotely configurable settings — these can be updated from the Capcan web UI.
+# Remotely configurable settings — can be updated from the Capcan web UI.
 # Changes pushed from the dashboard take effect on the next telemetry cycle.
-interval: 300
+interval: 180
+demo_mode: ${DEMO_MODE}
 collect:
   cpu: true
   memory: true
   disk: true
   network: true
   processes: true
+  temperatures: true
+  top_processes: true
+watchers:
+  file_integrity: true
+  process: true
+  network: true
+  login: true
+  service: true
+dynamic_collectors: []
 YAML
+
+# Include the demo attack simulator when building a demo bundle.
+# The C source is compiled to a standalone binary so no Python is needed.
+if [ "$DEMO_MODE" = "true" ]; then
+    echo "    [demo] Compiling demo_attack_sim.c …"
+    gcc -O2 -Wall -o "$BUNDLE_DIR/demo_attack_sim" \
+        "$REPO_ROOT/src/client_template/demo_attack_sim.c" -lpthread
+    echo "    [demo] demo_attack_sim binary included in bundle"
+    echo "    [demo] Run on target: ./demo_attack_sim --all"
+    echo ""
+fi
 
 # Write the service installer script (runs on the target VM)
 cat > "$BUNDLE_DIR/install-service.sh" <<'SERVICE'
@@ -82,6 +118,10 @@ cp "$(dirname "$0")/settings.yaml"          "$INSTALL_DIR/"
 cp "$(dirname "$0")/uninstall-service.sh"   "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/capcan-client"
 chmod +x "$INSTALL_DIR/uninstall-service.sh"
+if [ -f "$(dirname "$0")/demo_attack_sim" ]; then
+    cp "$(dirname "$0")/demo_attack_sim" "$INSTALL_DIR/"
+    chmod +x "$INSTALL_DIR/demo_attack_sim"
+fi
 
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<UNIT
 [Unit]
@@ -107,6 +147,9 @@ systemctl enable "$SERVICE_NAME"
 systemctl start  "$SERVICE_NAME"
 echo "==> Service started. Status:"
 systemctl status "$SERVICE_NAME" --no-pager
+
+echo "==> Cleaning up staging directory"
+rm -rf /tmp/capcan-client-bundle
 SERVICE
 
 chmod +x "$BUNDLE_DIR/install-service.sh"

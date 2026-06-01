@@ -9,7 +9,7 @@ from .templates.pre_renders import settings_prerender
 
 from ..api import register_api_blueprints
 from ..core.database import Database
-from ..utils.deployer import ensure_bundle
+from ..utils.deployer import ensure_bundle  # noqa: F401 — re-exported for __main__
 
 load_dotenv()
 
@@ -21,22 +21,22 @@ app.config['SECRET_KEY'] = os.getenv('WEB_SECRET_KEY')
 register_api_blueprints(app)
 
 # Create default web user on startup if it does not already exist
-_db = Database()
-_db.create_default_web_user()
-_db.close()
+db = Database()
+db.create_default_web_user()
+db.close()
 
 # Build (or refresh) the deployable client bundle.
 # SERVER_IP must be the externally reachable IP/hostname that deployed clients
 # will use to reach this server.  Set it in your .env file.
-_server_ip = os.getenv('SERVER_IP') or socket.gethostbyname(socket.gethostname())
-_server_port = int(os.getenv('FLASK_PORT', 5000))
+server_ip = os.getenv('SERVER_IP') or socket.gethostbyname(socket.gethostname())
+server_port = int(os.getenv('FLASK_PORT', 5000))
 if not os.getenv('SERVER_IP'):
     print(
-        f'[deployer] WARNING: SERVER_IP not set in environment — '
-        f'using detected address {_server_ip!r}. '
-        'Set SERVER_IP in your .env for reliable client deployments.'
+        f'[INFO] WARNING: SERVER_IP not set in environment — using detected address {server_ip!r}.\n'
+        f'[INFO] Set SERVER_IP in your .env for reliable client deployments.'
     )
-ensure_bundle(_server_ip, _server_port)
+# ensure_bundle is called from __main__.py after the --demo flag is parsed,
+# so demo_mode is correctly forwarded to the build script.
 
 @app.route('/')
 @app.route('/dashboard')
@@ -61,10 +61,13 @@ def Clients():
         return redirect('/login')
     db = Database()
     try:
-        current_user = db.get_web_user_by_id(session['user_id']) or {}
-        user_role = current_user.get('role', 'read-only')
+        current_user = db.get_web_user_by_id(session['user_id'])
     finally:
         db.close()
+    if current_user is None:
+        session.clear()
+        return redirect('/login')
+    user_role = current_user.get('role', 'read-only')
     client_id = request.args.get('client_id')
     context = {
         'client_list_html': clients_prerender.render_client_list(user_role),
@@ -83,11 +86,16 @@ def Settings():
 
     db = Database()
     try:
-        current_user = db.get_web_user_by_id(session['user_id']) or {}
-        user_role = current_user.get('role', 'read-only')
-        users_list = db.get_all_web_users() if user_role in ('admin', 'super-admin') else []
+        current_user = db.get_web_user_by_id(session['user_id'])
+        users_list = db.get_all_web_users() if current_user and current_user.get('role') in ('admin', 'super-admin') else []
     finally:
         db.close()
+
+    if current_user is None:
+        session.clear()
+        return redirect('/login')
+
+    user_role = current_user.get('role', 'read-only')
 
     demo_mode = current_app.config.get('DEMO_MODE', False)
 
@@ -119,10 +127,13 @@ def Alerts():
         return redirect(url_for('Login'))
     db = Database()
     try:
-        current_user = db.get_web_user_by_id(session['user_id']) or {}
-        user_role = current_user.get('role', 'read-only')
+        current_user = db.get_web_user_by_id(session['user_id'])
     finally:
         db.close()
+    if current_user is None:
+        session.clear()
+        return redirect(url_for('Login'))
+    user_role = current_user.get('role', 'read-only')
     selected_id = request.args.get('selected', '')
     return render_template('Capcan-html-alerts.html', preselected_alert=selected_id, user_role=user_role)
 

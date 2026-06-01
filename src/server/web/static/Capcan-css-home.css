@@ -139,6 +139,7 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
+    margin-right: 0.5rem;
 }
 
 /* Health Metrics */
@@ -273,7 +274,6 @@ a.dash-alert-link:hover { opacity: 0.8; }
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    margin-right: 0.5rem;
 }
 
 .status-dot.online {

@@ -910,3 +910,68 @@
 }
 
 .modal-feedback-err { color: #e74c3c; }
+
+/* ── Demo mode segmented selector ──────────────────── */
+.demo-mode-selector {
+    display: flex;
+    border: 1.5px solid var(--divider-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-main);
+    flex-shrink: 0;
+}
+
+.demo-seg-btn {
+    flex: 1;
+    padding: 0.45rem 1.1rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    border-right: 1.5px solid var(--divider-color);
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.demo-seg-btn:last-child { border-right: none; }
+
+.demo-seg-btn:hover {
+    background: var(--bg-card);
+    color: var(--text-main);
+}
+
+.demo-seg-btn.active[data-mode="false"] {
+    background: #c0392b;
+    color: #ffffff;
+    box-shadow: none;
+}
+
+.demo-seg-btn.active[data-mode="simulated"] {
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text);
+}
+
+.demo-seg-btn.active[data-mode="script"] {
+    background: #e67e22;
+    color: #ffffff;
+}
+
+/* ── Script command block ───────────────────────────── */
+.demo-script-cmd {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+    background: var(--bg-main);
+    border: 1.5px solid var(--divider-color);
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    margin: 0.5rem 0.25rem;
+    color: var(--text-main);
+    word-break: break-all;
+    white-space: pre-wrap;
+}
