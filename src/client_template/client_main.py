@@ -58,7 +58,7 @@ logging.basicConfig(
 log = logging.getLogger("capcan-client")
 
 DEFAULT_SETTINGS = { # Keep in sync with scripts/build_client.sh and deployer.py
-    "interval": 60, 
+    "interval": 120,
     "demo_mode": "false",
     "demo_alerts_per_hour": 20,
     "collect": {
@@ -1576,7 +1576,7 @@ def run() -> None:
                 time.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 300)
 
-    interval = settings.get("interval", 300)
+    interval = settings.get("interval", 120)
     log.info("Starting telemetry loop (interval=%ds)", interval)
 
     # Start honeypot file watchers (canary-file access detection)

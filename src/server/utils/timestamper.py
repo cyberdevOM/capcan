@@ -11,6 +11,14 @@ def parse_timestamp(timestamp_str):
     except ValueError as e:
         raise ValueError(f"Invalid timestamp format: {timestamp_str}. Expected ISO 8601 with 'Z' suffix.") from e
 
+def format_timestamp(dt_obj) -> str:
+    """Formats an existing datetime object to ISO 8601 with 'Z' suffix."""
+    if dt_obj is None:
+        return None
+    if hasattr(dt_obj, 'isoformat'):
+        return dt_obj.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+    return str(dt_obj)
+
 def format_uptime(seconds: int) -> str:
     """Format an uptime duration in seconds to a compact human-readable string."""
     if seconds < 60:

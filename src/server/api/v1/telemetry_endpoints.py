@@ -26,6 +26,7 @@ from ...utils.validators import (
 )
 from ...core.database import Database
 from ...utils import telemetry_cache
+from ...utils.timestamper import get_current_timestamp, format_timestamp
 
 telemetry_bp = Blueprint('telemetry', __name__, url_prefix='/telemetry')
 
@@ -218,7 +219,7 @@ def submit_telemetry():
         if not valid_data:
             return jsonify({"error": f"Invalid telemetry data: {data_error}"}), 400
 
-        current_time = datetime.utcnow().isoformat()
+        current_time = get_current_timestamp()
 
         # Persist to database
         db = Database()
@@ -237,8 +238,8 @@ def submit_telemetry():
 
         ack_id = generate_ack_id()
 
-        # Derive next_report_in from effective settings (fallback to 300s)
-        effective_interval = 300
+        # Derive next_report_in from effective settings (fallback to 120s)
+        effective_interval = 120
         if pending_settings and isinstance(pending_settings.get("interval"), (int, float)):
             effective_interval = int(pending_settings["interval"])
         elif effective and isinstance(effective.get("interval"), (int, float)):
@@ -314,7 +315,7 @@ def get_latest_telemetry(client_id: str):
 
         return jsonify({
             "client_id": client_id,
-            "timestamp": row["timestamp"].isoformat() if hasattr(row["timestamp"], "isoformat") else row["timestamp"],
+            "timestamp": format_timestamp(row["timestamp"]),
             **row["telemetry"],
         }), 200
 

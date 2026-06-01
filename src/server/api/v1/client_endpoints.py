@@ -24,6 +24,7 @@ import secrets
 import uuid
 from typing import Dict, Any
 from ...core.database import Database
+from ...utils.timestamper import get_current_timestamp
 
 # Import security validators
 from ...utils.validators import (
@@ -260,7 +261,7 @@ def register_client():
         except (TypeError, ValueError):
             return jsonify({"error": "Invalid version. Version must be a floating point number"}), 400
 
-        current_time = dt.datetime.now(dt.timezone.utc)
+        current_time = get_current_timestamp()
 
         # Persist client record (client_secret stored with client data)
         db = Database()
@@ -348,7 +349,6 @@ def admin_add_client():
             client_secret=secret_key, ip_address=ip_address, ssh_user=username,
         )
     except Exception as exc:
-        db.close()
         return jsonify({"error": f"Failed to register client: {exc}"}), 500
     finally:
         db.close()

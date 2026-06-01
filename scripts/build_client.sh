@@ -67,7 +67,7 @@ YAML
 cat > "$BUNDLE_DIR/settings.yaml" <<YAML
 # Remotely configurable settings — can be updated from the Capcan web UI.
 # Changes pushed from the dashboard take effect on the next telemetry cycle.
-interval: 180
+interval: 120
 demo_mode: ${DEMO_MODE}
 collect:
   cpu: true

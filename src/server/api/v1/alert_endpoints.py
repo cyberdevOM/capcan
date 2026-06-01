@@ -4,7 +4,7 @@ from email import utils
 from flask import Blueprint, request, jsonify
 import datetime as dt
 from typing import Dict, Any, List
-from src.server.utils.timestamper import parse_timestamp, get_current_timestamp
+from src.server.utils.timestamper import parse_timestamp, get_current_timestamp, format_timestamp
 import uuid
 from werkzeug.exceptions import BadRequest
 from ...utils.validators import (
@@ -156,13 +156,8 @@ def validate_alert_data(data: Dict[str, Any]) -> tuple[bool, str]:
     # Validate timestamp if provided
     if "timestamp" in data:
         try:
-            # Parse and convert to ISO 8601 with 'Z'
             parsed_time = parse_timestamp(data["timestamp"])
-            data["timestamp"] = (
-                parsed_time.replace(tzinfo=dt.timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z")
-            )
+            data["timestamp"] = format_timestamp(parsed_time)
         except (ValueError, AttributeError):
             return False, "Invalid timestamp format. Use ISO 8601 format."
 
@@ -432,7 +427,7 @@ def acknowledge_alert(alert_id):
     try:
         data = request.get_json() or {}
         acknowledged_by = data.get("acknowledged_by", "server")
-        current_time = dt.datetime.now(dt.timezone.utc).isoformat() + "Z"
+        current_time = get_current_timestamp()
 
         ok = db.acknowledge_alert(alert_id, acknowledged_by=acknowledged_by)
         if not ok:
@@ -485,8 +480,8 @@ def get_alert_history():
         # serialize datetimes
         def _serialize(a):
             for k in ("created_at", "acknowledged_at"):
-                if a.get(k) and hasattr(a[k], "isoformat"):
-                    a[k] = a[k].isoformat() + "Z"
+                if a.get(k):
+                    a[k] = format_timestamp(a[k])
             return a
 
         alerts = [_serialize(a) for a in alerts]
@@ -543,8 +538,8 @@ def get_single_alert(alert_id):
                 "status", "acknowledged_at", "acknowledged_by", "created_at", "details", "tags"]
         alert = dict(zip(cols, row))
         for k in ("created_at", "acknowledged_at"):
-            if alert.get(k) and hasattr(alert[k], "isoformat"):
-                alert[k] = alert[k].isoformat() + "Z"
+            if alert.get(k):
+                alert[k] = format_timestamp(alert[k])
         return jsonify(alert), 200
 
     except Exception as e:

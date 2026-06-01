@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 
 from ...core.database import Database
+from ...utils.timestamper import format_timestamp
 
 web_alerts_bp = Blueprint('web_alerts', __name__, url_prefix='/web/alerts')
 
@@ -39,7 +40,7 @@ def web_alerts():
         for a in alerts:
             for k in ('created_at', 'acknowledged_at'):
                 if a.get(k) and hasattr(a[k], 'isoformat'):
-                    a[k] = a[k].isoformat() + 'Z'
+                    a[k] = format_timestamp(a[k])
         return jsonify({'alerts': alerts, 'returned': len(alerts)})
     finally:
         db.close()
