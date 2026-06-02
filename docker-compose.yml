@@ -1,0 +1,77 @@
+# Capcan -- Docker Compose
+#
+# This is the only file you need to deploy Capcan.
+#
+# Setup (3 steps):
+#   1. Set SERVER_IP to the external IP or hostname your agent nodes will reach.
+#   2. Change all 'changeme' values to secure passwords/keys.
+#   3. Run: docker compose up -d
+#
+# The Capcan image is pulled automatically from GitHub Container Registry.
+# No local build, no .env file, no repository clone required.
+#
+# Services:
+#   db     -- PostgreSQL 16 (Alpine), data persisted in the postgres_data volume.
+#   server -- Capcan Flask server, client bundle persisted in the bundles volume.
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       capcan
+      POSTGRES_USER:     capcan
+      POSTGRES_PASSWORD: changeme            # <- change this
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U capcan -d capcan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: ghcr.io/cyberdevom/capcan:latest  # pin to a version tag for stability, e.g. :v1.0.0
+    restart: unless-stopped
+    environment:
+
+      # -- Required ------------------------------------------------------------
+      # The external IP or hostname agent nodes will use to reach this server.
+      # Must be reachable from outside this host -- not 127.0.0.1 or a container IP.
+      SERVER_IP: changeme       # <- set this
+
+      # -- Database (must match the db service above) --------------------------
+      DB_HOST:     db                        # do not change -- refers to the db container
+      DB_PORT:     5432
+      DB_NAME:     capcan
+      DB_USER:     capcan
+      DB_PASSWORD: changeme                  # <- must match POSTGRES_PASSWORD above
+
+      # -- Web dashboard default admin account ---------------------------------
+      # Used to create the first admin user on initial startup only.
+      WEB_DEFAULT_USER:     admin
+      WEB_DEFAULT_PASSWORD: changeme         # <- change this
+      WEB_DEFAULT_EMAIL:    admin@example.com
+
+      # -- Flask (optional overrides) ------------------------------------------
+      # WEB_SECRET_KEY is auto-generated and persisted by the container on first
+      # run -- you do not need to set it here. If you want to supply your own
+      # (e.g. to share sessions across multiple instances) you may add it here.
+      FLASK_PORT:  5000
+      FLASK_HOST:  0.0.0.0
+      FLASK_DEBUG: "false"
+
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist the client bundle across container restarts and upgrades.
+      # On first run the entrypoint seeds the pre-built binary from the image.
+      - bundles:/app/dist/capcan-client-bundle
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  bundles:

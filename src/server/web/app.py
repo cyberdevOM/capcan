@@ -1,5 +1,5 @@
 import os
-import socket
+import sys
 from flask import Flask, render_template, redirect, session, url_for, request, jsonify, current_app
 from dotenv import load_dotenv
 
@@ -25,16 +25,19 @@ db = Database()
 db.create_default_web_user()
 db.close()
 
-# Build (or refresh) the deployable client bundle.
-# SERVER_IP must be the externally reachable IP/hostname that deployed clients
-# will use to reach this server.  Set it in your .env file.
-server_ip = os.getenv('SERVER_IP') or socket.gethostbyname(socket.gethostname())
+# SERVER_IP must be set in the environment (docker-compose.yml or .env).
+# There is no automatic fallback — a missing value here means deployed agent
+# nodes would receive an unreachable server URL, which is a silent failure.
+server_ip = os.getenv('SERVER_IP')
 server_port = int(os.getenv('FLASK_PORT', 5000))
-if not os.getenv('SERVER_IP'):
+if not server_ip:
     print(
-        f'[INFO] WARNING: SERVER_IP not set in environment — using detected address {server_ip!r}.\n'
-        f'[INFO] Set SERVER_IP in your .env for reliable client deployments.'
+        '[FATAL] SERVER_IP environment variable is not set.\n'
+        '[FATAL] Set SERVER_IP to the external IP or hostname that deployed\n'
+        '[FATAL] agent nodes will use to reach this server, then restart.',
+        file=sys.stderr,
     )
+    sys.exit(1)
 # ensure_bundle is called from __main__.py after the --demo flag is parsed,
 # so demo_mode is correctly forwarded to the build script.
 
